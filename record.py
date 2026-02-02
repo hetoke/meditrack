@@ -272,6 +272,8 @@ def show_edit_ho_so_window(root, container, show_primary_window, hoso_id, record
 # delete_ho_so (persist delete to DB)
 # -------------------------
 def delete_ho_so(root, container, show_primary_window, page_label, hoso_id):
+    if not messagebox.askyesno("Xác nhận", "Bạn có chắc chắn muốn xoá hồ sơ này?"):
+        return
     session = get_session()
     h = session.get(HoSo, hoso_id)
     if h:
