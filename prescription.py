@@ -1,7 +1,7 @@
 import ttkbootstrap as tb
 import tkinter as tk
 from tkinter import messagebox
-from datetime import date
+from datetime import date, datetime
 
 from sqlalchemy.orm import selectinload
 
@@ -54,6 +54,13 @@ def safe_float(value):
 
 def format_currency(value):
     return f"{value:,.0f} đ"
+
+def format_ngaylap(value):
+    if isinstance(value, datetime):
+        return value.strftime("%d/%m/%Y %H:%M:%S")
+    if isinstance(value, date):
+        return value.strftime("%d/%m/%Y 00:00:00")
+    return datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
 
 def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_primary_window):
@@ -163,7 +170,7 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
 
         # ---- Prescription Table ----
         columns = ["Thuốc", "Sáng trước ăn", "Sáng sau ăn", "Trưa trước ăn",
-                   "Trưa sau ăn", "Chiều trước ăn", "Chiều sau ăn", "Tối"]
+                    "Trưa sau ăn", "Chiều trước ăn", "Chiều sau ăn", "Tối"]
         sau_an_indices = {2, 4, 6}
         col_widths = [22, 12, 12, 12, 12, 12, 12, 12]
 
@@ -180,14 +187,14 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
         canvas.create_window((0, 0), window=grid_frame, anchor="nw")
 
         # Header row
-        for c, text in enumerate(columns + ["Xoá"]):
-            tb.Label(
-                grid_frame,
-                text=text,
-                anchor="center",
-                bootstyle="secondary",
-                width=(col_widths[c] if c < len(columns) else 6),
-            ).grid(row=0, column=c, sticky="nsew", padx=1, pady=1)
+        # for c, text in enumerate(columns + ["Xoá"]):
+        #     tb.Label(
+        #         grid_frame,
+        #         text=text,
+        #         anchor="center",
+        #         bootstyle="secondary",
+        #         width=(col_widths[c] if c < len(columns) else 6),
+        #     ).grid(row=0, column=c, sticky="nsew", padx=1, pady=1)
 
         entries = []
 
@@ -261,8 +268,11 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
         current_index["value"] = index
         nav_label.config(text=f"Đơn {index+1}/{len(prescriptions)}")
         don_obj = prescriptions[index]["donthuoc"]
-        date_text = don_obj.NgayLap.strftime("%Y-%m-%d") if don_obj and don_obj.NgayLap else date.today().strftime("%Y-%m-%d")
-        date_label.config(text=f"Ngày lập đơn thuốc: {date_text}")
+        if don_obj and don_obj.NgayLap:
+            date_text = format_ngaylap(don_obj.NgayLap)
+            date_label.config(text=f"Ngày lập đơn thuốc: {date_text}")
+        else:
+            date_label.config(text="")
         total_value = calculate_total_from_donthuoc(prescriptions[index]["donthuoc"])
         sidebar_total_label.config(text=f"Tổng tiền: {format_currency(total_value)}")
         prev_btn.config(state=("disabled" if index == 0 else "normal"))
@@ -307,7 +317,7 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
         p = prescriptions[current_index["value"]]
         don_obj = p["donthuoc"]
         if don_obj is None:
-            don_obj = DonThuoc(HoSoID=hoso_id, NgayLap=date.today())
+            don_obj = DonThuoc(HoSoID=hoso_id, NgayLap=datetime.now())
         don_obj.MoTa = p["chandoan_text"].get("1.0", "end").strip()
         don_obj = session_local.merge(don_obj)
         session_local.commit()
@@ -357,8 +367,11 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
             options=[selectinload(DonThuoc.chidinh_list).selectinload(ChiDinh.thuoc)],
         )
         p["donthuoc"] = don_obj
-        date_text = don_obj.NgayLap.strftime("%Y-%m-%d") if don_obj.NgayLap else date.today().strftime("%Y-%m-%d")
-        date_label.config(text=f"Ngày lập đơn thuốc: {date_text}")
+        if don_obj and don_obj.NgayLap:
+            date_text = format_ngaylap(don_obj.NgayLap)
+            date_label.config(text=f"Ngày lập đơn thuốc: {date_text}")
+        else:
+            date_label.config(text="")
         sidebar_total_label.config(text=f"Tổng tiền: {format_currency(total_cost)}")
         session_local.close()
         messagebox.showinfo("Thông báo", "Đã lưu đơn thuốc thành công!")

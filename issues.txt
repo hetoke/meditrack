@@ -2,14 +2,22 @@ Beta v1.1
 Fix critical bug on record fetching as year must allow only numbers
 
 ------------------------------------
-Bug in search medicine, enter after autocompleting does not apply the search
-Search by surname, year
-Responsive width or slider
+Delete labels Tiền căn, chuẩn đoán, remove table header [clear]
+
+Fix date into datetime [clear]
+
 Default as latest prescription
+
+Zoom in / zoom out in prescription
+
+Search by surname, year
+
 Duplicate prescription (nhân bản toa hiện tại)
-Fix date into datetime
-Prompt before return record list when forgot saving
-Delete labels Tiền căn, chuẩn đoán, no table header
-Zoom in, zoom out in prescription
+
+Prompt before returning record list when forgot saving
+
+Bug in search medicine: Enter after autocomplete does not apply the search
+
+Responsive width or slider
 
 Will be in beta v1.2

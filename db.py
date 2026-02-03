@@ -1,5 +1,5 @@
 from datetime import date
-from sqlalchemy import create_engine, Column, Integer, String, Date, Float, ForeignKey, DECIMAL, Text, UniqueConstraint
+from sqlalchemy import create_engine, Column, Integer, String, Date, DateTime, Float, ForeignKey, DECIMAL, Text, UniqueConstraint
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
 Base = declarative_base()
@@ -30,7 +30,7 @@ class DonThuoc(Base):
 
     DonThuocID = Column(Integer, primary_key=True, autoincrement=True)
     HoSoID = Column(Integer, ForeignKey("hoso.HoSoID"))
-    NgayLap = Column(Date)
+    NgayLap = Column(DateTime)
     MoTa = Column(Text)
     TienToa = Column(DECIMAL)
 
