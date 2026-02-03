@@ -2,20 +2,17 @@ Beta v1.1
 Fix critical bug on record fetching as year must allow only numbers
 
 ------------------------------------
-Delete labels Tiền căn, chuẩn đoán, remove table header [resolved]
+Remove table header [resolved]
 Fix date into datetime [resolved]
 Default as latest prescription [resolved]
 Zoom in / zoom out in prescription [resolved]
 Resizeable columns [resolved]
 Migrate most record view buttons into the sidebar [resolved]
 Bug in search medicine: Enter after autocomplete does not apply the search [resolved]
-
-Search by surname, year
-Idea for filter function: number as delimeters -> number[0] as year, letters[0] as name -> trim -> name is search right to left, year is optional
-
-Duplicate prescription (nhân bản toa hiện tại)
-
-Prompt before returning record list when forgot saving
+Search by surname, year in record autocomplete [resolved]
+Duplicate current prescription [resolved]
+Prompt before returning record list when forgot saving [resolved]
+Fixing deleting prescription without saving bug [resolved]
 
 
 

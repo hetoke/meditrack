@@ -4,7 +4,7 @@ import tkinter.font as tkfont
 from tkinter import messagebox
 from datetime import date, datetime
 
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import object_session, selectinload
 
 from db import DonThuoc, ChiDinh, Thuoc
 from db_connect import get_session
@@ -55,6 +55,27 @@ def safe_float(value):
 
 def format_currency(value):
     return f"{value:,.0f} đ"
+
+def ensure_donthuoc_loaded(donthuoc_obj):
+    if not donthuoc_obj:
+        return None
+    if "chidinh_list" in donthuoc_obj.__dict__:
+        return donthuoc_obj
+    if object_session(donthuoc_obj) is None:
+        don_id = getattr(donthuoc_obj, "DonThuocID", None)
+        if not don_id:
+            return donthuoc_obj
+        session = get_session()
+        try:
+            donthuoc_obj = session.get(
+                DonThuoc,
+                don_id,
+                options=[selectinload(DonThuoc.chidinh_list).selectinload(ChiDinh.thuoc)],
+            )
+            session.expunge_all()
+        finally:
+            session.close()
+    return donthuoc_obj
 
 def format_ngaylap(value):
     if isinstance(value, datetime):
@@ -146,14 +167,17 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
     base_pad = 1
     base_row = base_font_size + 2
 
-    def build_font(widget, size):
-        try:
-            font_value = widget.cget("font")
-            f = tkfont.nametofont(font_value).copy()
-            f.configure(size=size)
-            return f
-        except Exception:
-            return ("TkDefaultFont", size)
+    table_font_family = "Quicksand"
+    if table_font_family not in tkfont.families():
+        table_font_family = tkfont.nametofont("TkDefaultFont").cget("family")
+    font_cache = {}
+
+    def build_font(size):
+        f = font_cache.get(size)
+        if f is None:
+            f = tkfont.Font(family=table_font_family, size=size)
+            font_cache[size] = f
+        return f
 
     def apply_table_zoom(prescription):
         zoom = prescription.get("zoom", 1.0)
@@ -172,7 +196,7 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
         width_scale = zoom * 0.75 if zoom < 1.0 else zoom
         for w in grid.winfo_children():
             try:
-                w.configure(font=build_font(w, size))
+                w.configure(font=build_font(size))
             except Exception:
                 pass
             try:
@@ -198,12 +222,13 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
 
     zoom_row = tb.Frame(sidebar_actions)
     zoom_row.pack(fill="x", pady=2)
-    tb.Button(zoom_row, text="A-", command=lambda: zoom_table(-zoom_step)).pack(side="left", expand=True, fill="x", padx=(0, 2))
-    tb.Button(zoom_row, text="A+", command=lambda: zoom_table(zoom_step)).pack(side="left", expand=True, fill="x", padx=(2, 0))
+    tb.Button(zoom_row, text="Thu nhỏ", command=lambda: zoom_table(-zoom_step)).pack(side="left", expand=True, fill="x", padx=(0, 2))
+    tb.Button(zoom_row, text="Phóng to", command=lambda: zoom_table(zoom_step)).pack(side="left", expand=True, fill="x", padx=(2, 0))
 
     # --- Helper: Build single prescription UI ---
     def calculate_total_from_donthuoc(donthuoc_obj):
         total = 0.0
+        donthuoc_obj = ensure_donthuoc_loaded(donthuoc_obj)
         if not donthuoc_obj:
             return total
         for chi in donthuoc_obj.chidinh_list:
@@ -220,7 +245,7 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
             total += dose * price
         return total
 
-    def build_prescription(donthuoc_obj=None):
+    def build_prescription(donthuoc_obj=None, seed_rows=None, seed_chandoan=None):
         frame = tb.Frame(content, padding=10)
         prescriptions.append({
             "frame": frame,
@@ -230,6 +255,7 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
             "grid_frame": None,
             "zoom": 1.0,
             "row_count": 0,
+            "dirty": False,
         })
         p = prescriptions[-1]
 
@@ -240,6 +266,18 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
         chandoan_text.pack(fill="x")
         if donthuoc_obj:
             chandoan_text.insert("1.0", donthuoc_obj.MoTa)
+        elif seed_chandoan:
+            chandoan_text.insert("1.0", seed_chandoan)
+            p["dirty"] = True
+
+        def mark_dirty(*_):
+            p["dirty"] = True
+
+        def on_text_modified(event):
+            w = event.widget
+            if w.edit_modified():
+                mark_dirty()
+                w.edit_modified(False)
 
         # ---- Prescription Table ----
         columns = ["Thuốc", "Sáng trước ăn", "Sáng sau ăn", "Trưa trước ăn",
@@ -316,9 +354,13 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
                 else:
                     e = tk.Entry(grid_frame, width=col_widths[c])
                 e.insert(0, v)
+                if v:
+                    p["dirty"] = True
                 if c in sau_an_indices:
                     e.config(bg="#FFC107")
                 e.grid(row=row_index, column=c, sticky="nsew", padx=1, pady=1)
+                e.bind("<KeyRelease>", mark_dirty)
+                e.bind("<FocusOut>", mark_dirty)
                 e.bind("<Motion>", lambda ev, col=c: cell_motion(ev, col))
                 e.bind("<Button-1>", lambda ev, col=c: start_resize(ev, col))
                 e.bind("<B1-Motion>", lambda ev, col=c: do_resize(ev, col))
@@ -334,6 +376,7 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
                 if row_entries in entries:
                     entries.remove(row_entries)
                 p["row_count"] = len(entries)
+                p["dirty"] = True
                 grid_frame.update_idletasks()
                 canvas.config(scrollregion=canvas.bbox("all"))
 
@@ -345,7 +388,7 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
             grid_frame.update_idletasks()
             canvas.config(scrollregion=canvas.bbox("all"))
 
-        # Populate rows from DB
+        # Populate rows from DB / seed data
         if donthuoc_obj and donthuoc_obj.chidinh_list:
             for chi in donthuoc_obj.chidinh_list:
                 name = chi.thuoc.Ten if chi.thuoc else "(Thuốc không tồn tại)"
@@ -359,16 +402,23 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
                     chi.ChieuSauAn or "",
                     chi.Toi or "",
                 ])
+        elif seed_rows:
+            for row in seed_rows:
+                add_row(row)
         else:
             add_row()
 
         tb.Button(frame, text="Thêm dòng", bootstyle="success",
                   command=lambda: add_row()).pack(anchor="e", pady=5)
 
+        chandoan_text.bind("<<Modified>>", on_text_modified)
         prescriptions[-1]["chandoan_text"] = chandoan_text
         prescriptions[-1]["entries"] = entries
+        prescriptions[-1]["add_row"] = add_row
 
         return frame
+
+    delete_btn = None
 
     # --- Navigation / CRUD functions ---
     def show_prescription(index):
@@ -387,6 +437,8 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
         sidebar_total_label.config(text=f"Tổng tiền: {format_currency(total_value)}")
         prev_btn.config(state=("disabled" if index == 0 else "normal"))
         next_btn.config(state=("disabled" if index == len(prescriptions)-1 else "normal"))
+        if delete_btn:
+            delete_btn.config(state=("disabled" if len(prescriptions) <= 1 else "normal"))
         apply_table_zoom(prescriptions[index])
 
     def next_prescription():
@@ -401,10 +453,29 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
         build_prescription()
         show_prescription(len(prescriptions) - 1)
 
+    def duplicate_prescription():
+        if not prescriptions:
+            return
+        src = prescriptions[current_index["value"]]
+        chandoan = src["chandoan_text"].get("1.0", "end").strip() if src.get("chandoan_text") else ""
+        rows = []
+        for row in src.get("entries", []):
+            vals = [e.get() for e in row]
+            if any(v.strip() for v in vals):
+                rows.append(vals)
+        build_prescription(seed_rows=rows if rows else None, seed_chandoan=chandoan)
+        prescriptions[-1]["dirty"] = True
+        show_prescription(len(prescriptions) - 1)
+
     def delete_prescription(index):
         if not prescriptions or index < 0 or index >= len(prescriptions):
             return
         p = prescriptions[index]
+        if p.get("dirty"):
+            if not messagebox.askyesno("Chưa lưu", "Đơn thuốc này có thay đổi chưa lưu. Xoá vẫn tiếp tục?"):
+                return
+        if not messagebox.askyesno("Xác nhận", "Bạn có chắc chắn muốn xoá đơn thuốc này?"):
+            return
         don_obj = p.get("donthuoc")
         if don_obj:
             session_local = get_session()
@@ -486,6 +557,7 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
         sidebar_total_label.config(text=f"Tổng tiền: {format_currency(total_cost)}")
         session_local.close()
         messagebox.showinfo("Thông báo", "Đã lưu đơn thuốc thành công!")
+        p["dirty"] = False
 
     # --- Build prescriptions from DB ---
     for don in donthuoc_list:
@@ -501,18 +573,30 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
     next_btn.config(command=next_prescription)
     tb.Button(sidebar_actions, text="+ Thêm đơn thuốc", bootstyle="success",
               command=add_prescription).pack(fill="x", pady=2)
+    tb.Button(sidebar_actions, text="⎘ Nhân bản đơn hiện tại", bootstyle="secondary",
+              command=duplicate_prescription).pack(fill="x", pady=2)
     tb.Button(sidebar_actions, text="💾 Lưu đơn thuốc hiện tại", bootstyle="primary",
               command=save_current_prescription).pack(fill="x", pady=2)
-    if len(prescriptions) > 1:
-        tb.Button(sidebar_actions, text="🗑 Xoá đơn thuốc hiện tại", bootstyle="danger",
-                  command=lambda idx=current_index["value"]: delete_prescription(idx)).pack(fill="x", pady=2)
+    delete_btn = tb.Button(
+        sidebar_actions,
+        text="🗑 Xoá đơn thuốc hiện tại",
+        bootstyle="danger",
+        command=lambda: delete_prescription(current_index["value"]),
+    )
+    delete_btn.pack(fill="x", pady=2)
 
     # --- Back button ---
+    def confirm_back():
+        if any(p.get("dirty") for p in prescriptions):
+            if not messagebox.askyesno("Chưa lưu", "Bạn có thay đổi chưa lưu. Quay lại mà không lưu?"):
+                return
+        show_ho_so_window(root, container, show_primary_window)
+
     tb.Button(
         container,
         text="⬅ Quay lại",
         bootstyle="secondary",
-        command=lambda: show_ho_so_window(root, container, show_primary_window),
+        command=confirm_back,
     ).pack(pady=20)
 
 

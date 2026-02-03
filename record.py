@@ -34,20 +34,39 @@ def remove_accents(s):
 import re
 
 
-def fetch_patient_suggestions(query: str):
+def parse_search_query(query: str):
     query_norm = remove_accents(query.strip().lower())
     if not query_norm:
+        return "", None
+    nums = re.findall(r"\d+", query_norm)
+    year = int(nums[0]) if nums else None
+    letters = re.findall(r"[a-z]+", query_norm)
+    name = " ".join(letters).strip()
+    return name, year
+
+
+def name_matches(full_name: str, name_query: str):
+    if not name_query:
+        return True
+    full_norm = remove_accents(full_name.strip().lower())
+    return full_norm.endswith(name_query)
+
+
+def fetch_patient_suggestions(query: str):
+    name_query, year_query = parse_search_query(query)
+    if not name_query and year_query is None:
         return []
 
     session = get_session()
-    results = session.query(HoSo.Ten).all()
+    results = session.query(HoSo.Ten, HoSo.NamSinh).all()
     session.close()
 
     suggestions = []
-    pattern = re.compile(rf"^{re.escape(query_norm)}")  # matches start of string
-    for (name,) in results:
-        name_norm = remove_accents(name.strip().lower())
-        if pattern.match(name_norm):
+    for name, year in results:
+        if year_query is not None:
+            if year is None or int(year) != year_query:
+                continue
+        if name_matches(name, name_query):
             suggestions.append(name)
     return suggestions
 
@@ -111,7 +130,12 @@ def show_ho_so_window(root, container, show_primary_window):
     def on_search_change(*args):
         query = search_entry.get().strip()
         if query:
-            filtered_records["data"] = [r for r in records if query.lower() in r[1].lower()]
+            name_query, year_query = parse_search_query(query)
+            filtered_records["data"] = [
+                r for r in records
+                if (year_query is None or (r[2] is not None and int(r[2]) == year_query))
+                and name_matches(r[1], name_query)
+            ]
         else:
             filtered_records["data"] = records.copy()
         current_page["value"] = 1

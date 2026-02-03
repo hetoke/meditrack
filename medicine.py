@@ -43,7 +43,7 @@ def render_medicine_list(root, page_container, page_label, show_primary_window, 
         card.pack(fill="x", pady=5)
 
         tb.Label(card, text=f"💊 {name}", font=("Quicksand", 12, "bold")).pack(anchor="w")
-        tb.Label(card, text=f"{price}đ / viên").pack(anchor="w")
+        tb.Label(card, text=f"{price}đ").pack(anchor="w")
 
         btn_frame = tb.Frame(card)
         btn_frame.pack(anchor="e")
@@ -120,12 +120,12 @@ def show_thuoc_window(root, page_container, show_primary_window):
     page_label.pack(side="left")
 
     tb.Button(
-        pagination_frame, text="← Previous",
+        pagination_frame, text="← Trước",
         command=lambda: change_page(-1, medicine_frame, page_label, root, show_primary_window, filtered_medicines["data"])
     ).pack(side="left", padx=10)
 
     tb.Button(
-        pagination_frame, text="Next →",
+        pagination_frame, text="Sau →",
         command=lambda: change_page(1, medicine_frame, page_label, root, show_primary_window, filtered_medicines["data"])
     ).pack(side="left", padx=10)
 

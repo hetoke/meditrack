@@ -43,7 +43,7 @@ def show_primary_window(root, container):
 
 def main():
     root = tb.Window(themename="flatly")
-    root.title("Medical Management")
+    root.title("Phòng khám Thành Tâm")
     root.state("zoomed")
 
     # --- Load custom TTF font ---
