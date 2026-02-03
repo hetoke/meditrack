@@ -1,5 +1,6 @@
 import ttkbootstrap as tb
 import tkinter as tk
+import tkinter.font as tkfont
 from tkinter import messagebox
 from datetime import date, datetime
 
@@ -87,13 +88,16 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
     )
     sidebar_total_label.pack(fill="x", pady=5)
 
+    sidebar_actions = tb.Frame(sidebar)
+    sidebar_actions.pack(fill="x", pady=(10, 5))
+
     # --- Content ---
     content = tb.Frame(container, padding=20)
     content.pack(side="left", fill="both", expand=True)
 
     # ---- Tiá»n cÄƒn ----
     tiencan_box = tb.Labelframe(content, text="Tiền căn", padding=10)
-    tiencan_box.pack(fill="x", pady=5)
+    tiencan_box.pack(fill="x", pady=(2, 4))
 
     tiencan_text = tk.Text(tiencan_box, height=3, wrap="word")
     tiencan_text.pack(fill="x")
@@ -116,21 +120,86 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
     session.expunge_all()
     session.close()
 
-    # --- Navigation bar first so functions can access it ---
-    nav_frame = tb.Frame(content)
-    nav_frame.pack(fill="x", pady=5)
+    # --- Navigation in sidebar ---
+    sidebar_nav = tb.Frame(sidebar)
+    sidebar_nav.pack(fill="x", pady=(10, 5))
 
-    prev_btn = tb.Button(nav_frame, text="Trước")
-    prev_btn.pack(side="left")
+    nav_row = tb.Frame(sidebar_nav)
+    nav_row.pack(fill="x", pady=2)
 
-    nav_label = tb.Label(nav_frame, text="")
-    nav_label.pack(side="left", padx=10)
+    prev_btn = tb.Button(nav_row, text="Trước")
+    prev_btn.pack(side="left", expand=True, fill="x", padx=(0, 2))
 
-    date_label = tb.Label(nav_frame, text="")
-    date_label.pack(side="left", padx=10)
+    nav_label = tb.Label(nav_row, text="")
+    nav_label.pack(side="left", expand=True, fill="x")
 
-    next_btn = tb.Button(nav_frame, text="Sau")
-    next_btn.pack(side="left")
+    next_btn = tb.Button(nav_row, text="Sau")
+    next_btn.pack(side="left", expand=True, fill="x", padx=(2, 0))
+
+    date_label = tb.Label(sidebar_nav, text="")
+    date_label.pack(fill="x", pady=2)
+
+    base_font_size = tkfont.nametofont("TkDefaultFont").cget("size") + 2
+    zoom_min = 0.5
+    zoom_max = 1.5
+    zoom_step = 0.1
+    base_pad = 1
+    base_row = base_font_size + 2
+
+    def build_font(widget, size):
+        try:
+            font_value = widget.cget("font")
+            f = tkfont.nametofont(font_value).copy()
+            f.configure(size=size)
+            return f
+        except Exception:
+            return ("TkDefaultFont", size)
+
+    def apply_table_zoom(prescription):
+        zoom = prescription.get("zoom", 1.0)
+        size = max(8, min(24, int(round(base_font_size * zoom))))
+        pad = max(0, int(round(base_pad * zoom)))
+        ipad = max(0, int(round(2 * zoom)))
+        row_height = max(10, int(round(base_row * zoom)))
+        grid = prescription.get("grid_frame")
+        if not grid:
+            return
+        row_count = prescription.get("row_count", 0)
+        if row_count:
+            for r in range(row_count):
+                grid.grid_rowconfigure(r, minsize=row_height)
+        col_widths = prescription.get("col_widths", [])
+        width_scale = zoom * 0.75 if zoom < 1.0 else zoom
+        for w in grid.winfo_children():
+            try:
+                w.configure(font=build_font(w, size))
+            except Exception:
+                pass
+            try:
+                info = w.grid_info()
+                col = int(info.get("column", 0))
+                if col_widths:
+                    if col < len(col_widths):
+                        w.configure(width=max(5, int(round(col_widths[col] * width_scale))))
+                    else:
+                        w.configure(width=max(3, int(round(6 * zoom))))
+                w.grid_configure(padx=pad, pady=pad, ipady=ipad)
+            except Exception:
+                pass
+
+    def zoom_table(delta):
+        if not prescriptions:
+            return
+        p = prescriptions[current_index["value"]]
+        new_zoom = p.get("zoom", 1.0) + delta
+        new_zoom = max(zoom_min, min(zoom_max, new_zoom))
+        p["zoom"] = new_zoom
+        apply_table_zoom(p)
+
+    zoom_row = tb.Frame(sidebar_actions)
+    zoom_row.pack(fill="x", pady=2)
+    tb.Button(zoom_row, text="A-", command=lambda: zoom_table(-zoom_step)).pack(side="left", expand=True, fill="x", padx=(0, 2))
+    tb.Button(zoom_row, text="A+", command=lambda: zoom_table(zoom_step)).pack(side="left", expand=True, fill="x", padx=(2, 0))
 
     # --- Helper: Build single prescription UI ---
     def calculate_total_from_donthuoc(donthuoc_obj):
@@ -158,11 +227,15 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
             "donthuoc": donthuoc_obj,
             "entries": [],
             "chandoan_text": None,
+            "grid_frame": None,
+            "zoom": 1.0,
+            "row_count": 0,
         })
+        p = prescriptions[-1]
 
         # ---- Chuáº©n Ä‘oÃ¡n ----
         chandoan_box = tb.Labelframe(frame, text="Chuẩn đoán", padding=10)
-        chandoan_box.pack(fill="x", pady=5)
+        chandoan_box.pack(fill="x", pady=(2, 4))
         chandoan_text = tk.Text(chandoan_box, height=3, wrap="word")
         chandoan_text.pack(fill="x")
         if donthuoc_obj:
@@ -173,9 +246,10 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
                     "Trưa sau ăn", "Chiều trước ăn", "Chiều sau ăn", "Tối"]
         sau_an_indices = {2, 4, 6}
         col_widths = [22, 12, 12, 12, 12, 12, 12, 12]
+        p["col_widths"] = col_widths
 
         table_outer = tb.Frame(frame)
-        table_outer.pack(fill="both", expand=True, padx=20, pady=10)
+        table_outer.pack(fill="both", expand=True, padx=20, pady=(2, 6))
 
         canvas = tk.Canvas(table_outer)
         vsb = tb.Scrollbar(table_outer, orient="vertical", command=canvas.yview)
@@ -185,18 +259,46 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
 
         grid_frame = tb.Frame(canvas)
         canvas.create_window((0, 0), window=grid_frame, anchor="nw")
+        p["grid_frame"] = grid_frame
 
-        # Header row
-        # for c, text in enumerate(columns + ["Xoá"]):
-        #     tb.Label(
-        #         grid_frame,
-        #         text=text,
-        #         anchor="center",
-        #         bootstyle="secondary",
-        #         width=(col_widths[c] if c < len(columns) else 6),
-        #     ).grid(row=0, column=c, sticky="nsew", padx=1, pady=1)
+        resize_state = {"col": None, "start_x": 0, "start_w": 0}
+
+        def cell_motion(event, col):
+            w = event.widget
+            if w.winfo_width() - event.x <= 6:
+                w.configure(cursor="sb_h_double_arrow")
+            else:
+                w.configure(cursor="")
+
+        def start_resize(event, col):
+            w = event.widget
+            if w.winfo_width() - event.x <= 6:
+                resize_state["col"] = col
+                resize_state["start_x"] = event.x_root
+                resize_state["start_w"] = w.winfo_width()
+                w.configure(cursor="sb_h_double_arrow")
+            else:
+                resize_state["col"] = None
+
+        def do_resize(event, col):
+            if resize_state["col"] != col:
+                return
+            dx = event.x_root - resize_state["start_x"]
+            new_px = max(40, resize_state["start_w"] + dx)
+            font = tkfont.nametofont("TkDefaultFont")
+            char_w = max(1, font.measure("0"))
+            col_widths[col] = max(5, int(round(new_px / char_w)))
+            p["col_widths"] = col_widths
+            apply_table_zoom(p)
+
+        def stop_resize(event, col):
+            if resize_state["col"] == col:
+                resize_state["col"] = None
+            event.widget.configure(cursor="")
 
         entries = []
+        p["row_count"] = 0
+        apply_table_zoom(p)
 
         def add_row(row_values=None):
             row_index = len(entries) + 1
@@ -217,20 +319,28 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
                 if c in sau_an_indices:
                     e.config(bg="#FFC107")
                 e.grid(row=row_index, column=c, sticky="nsew", padx=1, pady=1)
+                e.bind("<Motion>", lambda ev, col=c: cell_motion(ev, col))
+                e.bind("<Button-1>", lambda ev, col=c: start_resize(ev, col))
+                e.bind("<B1-Motion>", lambda ev, col=c: do_resize(ev, col))
+                e.bind("<ButtonRelease-1>", lambda ev, col=c: stop_resize(ev, col))
                 row_entries.append(e)
 
             entries.append(row_entries)
+            p["row_count"] = len(entries)
 
             def delete_row():
                 for e in row_entries + [btn]:
                     e.destroy()
                 if row_entries in entries:
                     entries.remove(row_entries)
+                p["row_count"] = len(entries)
                 grid_frame.update_idletasks()
                 canvas.config(scrollregion=canvas.bbox("all"))
 
             btn = tb.Button(grid_frame, text="X", bootstyle="danger", command=delete_row)
             btn.grid(row=row_index, column=len(columns), sticky="nsew", padx=1, pady=1)
+
+            apply_table_zoom(prescriptions[-1])
 
             grid_frame.update_idletasks()
             canvas.config(scrollregion=canvas.bbox("all"))
@@ -277,6 +387,7 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
         sidebar_total_label.config(text=f"Tổng tiền: {format_currency(total_value)}")
         prev_btn.config(state=("disabled" if index == 0 else "normal"))
         next_btn.config(state=("disabled" if index == len(prescriptions)-1 else "normal"))
+        apply_table_zoom(prescriptions[index])
 
     def next_prescription():
         if current_index["value"] < len(prescriptions) - 1:
@@ -381,16 +492,20 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
         build_prescription(don)
     if not prescriptions:
         build_prescription()
-    show_prescription(0)
+        show_prescription(0)
+    else:
+        show_prescription(len(prescriptions) - 1)
 
     # --- Connect navigation buttons ---
     prev_btn.config(command=prev_prescription)
     next_btn.config(command=next_prescription)
-    tb.Button(nav_frame, text="+ Thêm đơn thuốc", bootstyle="success", command=add_prescription).pack(side="right", padx=5)
-    tb.Button(nav_frame, text="💾 Lưu đơn thuốc hiện tại", bootstyle="primary", command=save_current_prescription).pack(side="right", padx=5)
+    tb.Button(sidebar_actions, text="+ Thêm đơn thuốc", bootstyle="success",
+              command=add_prescription).pack(fill="x", pady=2)
+    tb.Button(sidebar_actions, text="💾 Lưu đơn thuốc hiện tại", bootstyle="primary",
+              command=save_current_prescription).pack(fill="x", pady=2)
     if len(prescriptions) > 1:
-        tb.Button(nav_frame, text="🗑 Xoá đơn thuốc hiện tại", bootstyle="danger",
-                  command=lambda idx=current_index["value"]: delete_prescription(idx)).pack(side="right", padx=5)
+        tb.Button(sidebar_actions, text="🗑 Xoá đơn thuốc hiện tại", bootstyle="danger",
+                  command=lambda idx=current_index["value"]: delete_prescription(idx)).pack(fill="x", pady=2)
 
     # --- Back button ---
     tb.Button(

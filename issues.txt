@@ -2,13 +2,17 @@ Beta v1.1
 Fix critical bug on record fetching as year must allow only numbers
 
 ------------------------------------
-Delete labels Tiền căn, chuẩn đoán, remove table header [clear]
+Delete labels Tiền căn, chuẩn đoán, remove table header [resolved]
 
-Fix date into datetime [clear]
+Fix date into datetime [resolved]
 
-Default as latest prescription
+Default as latest prescription [resolved]
 
-Zoom in / zoom out in prescription
+Zoom in / zoom out in prescription [resolved]
+
+Resizeable columns [resolved]
+
+Migrate most record view buttons into the sidebar [resolved]
 
 Search by surname, year
 
