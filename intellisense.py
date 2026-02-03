@@ -50,6 +50,7 @@ class AutocompleteEntry(tk.Entry):
             index = self.listbox.curselection()[0]
             value = self.listbox.get(index)
             self.var.set(value)
+            self.event_generate("<<AutocompleteSelected>>")
         self.destroy_listbox()
 
     def move_down(self, event):

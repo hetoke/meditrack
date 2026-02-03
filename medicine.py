@@ -27,13 +27,16 @@ current_page = {"value": 1}
 # -------------------------
 # Page functions
 # -------------------------
-def render_medicine_list(root, page_container, page_label, show_primary_window):
+def render_medicine_list(root, page_container, page_label, show_primary_window, medicine_list=None):
     for w in page_container.winfo_children():
         w.destroy()
 
+    if medicine_list is None:
+        medicine_list = medicines
+
     start = (current_page["value"] - 1) * ITEMS_PER_PAGE
     end = start + ITEMS_PER_PAGE
-    page_items = medicines[start:end]
+    page_items = medicine_list[start:end]
 
     for name, price in page_items:
         card = tb.Frame(page_container, padding=10)
@@ -55,14 +58,16 @@ def render_medicine_list(root, page_container, page_label, show_primary_window):
             command=lambda n=name: delete_medicine(root, page_container, show_primary_window, page_label, n)
         ).pack(side="left")
 
-    max_page = max(1, (len(medicines) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
+    max_page = max(1, (len(medicine_list) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
     page_label.config(text=f"Page {current_page['value']} / {max_page}")
 
 
-def change_page(direction, page_container, page_label, root, show_primary_window):
-    max_page = max(1, (len(medicines) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
+def change_page(direction, page_container, page_label, root, show_primary_window, medicine_list=None):
+    if medicine_list is None:
+        medicine_list = medicines
+    max_page = max(1, (len(medicine_list) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
     current_page["value"] = max(1, min(max_page, current_page["value"] + direction))
-    render_medicine_list(root, page_container, page_label, show_primary_window)
+    render_medicine_list(root, page_container, page_label, show_primary_window, medicine_list=medicine_list)
 
 
 def show_thuoc_window(root, page_container, show_primary_window):
@@ -77,8 +82,28 @@ def show_thuoc_window(root, page_container, show_primary_window):
     def fetch_suggestions(query):
         return [name for name, _ in medicines]
 
-    AutocompleteEntry(search_frame, width=100, fetch_suggestions=fetch_suggestions).pack(side="left", padx=5)
-    tb.Button(search_frame, text="×").pack(side="left", padx=5)
+    search_entry = AutocompleteEntry(search_frame, width=100, fetch_suggestions=fetch_suggestions)
+    search_entry.pack(side="left", padx=5)
+    tb.Button(
+        search_frame,
+        text="×",
+        command=lambda: (search_entry.delete(0, "end"), on_search_change()),
+    ).pack(side="left", padx=5)
+
+    filtered_medicines = {"data": medicines.copy()}
+
+    def on_search_change(*args):
+        query = search_entry.get().strip().lower()
+        if query:
+            filtered_medicines["data"] = [m for m in medicines if query in m[0].lower()]
+        else:
+            filtered_medicines["data"] = medicines.copy()
+        current_page["value"] = 1
+        render_medicine_list(root, medicine_frame, page_label, show_primary_window, medicine_list=filtered_medicines["data"])
+
+    search_entry.bind("<KeyRelease>", on_search_change)
+    search_entry.bind("<<AutocompleteSelected>>", lambda e: on_search_change())
+    search_entry.bind("<Return>", lambda e: on_search_change(), add="+")
 
     tb.Button(
         search_frame, text="+ Thêm thuốc", bootstyle="success",
@@ -96,18 +121,18 @@ def show_thuoc_window(root, page_container, show_primary_window):
 
     tb.Button(
         pagination_frame, text="← Previous",
-        command=lambda: change_page(-1, medicine_frame, page_label, root, show_primary_window)
+        command=lambda: change_page(-1, medicine_frame, page_label, root, show_primary_window, filtered_medicines["data"])
     ).pack(side="left", padx=10)
 
     tb.Button(
         pagination_frame, text="Next →",
-        command=lambda: change_page(1, medicine_frame, page_label, root, show_primary_window)
+        command=lambda: change_page(1, medicine_frame, page_label, root, show_primary_window, filtered_medicines["data"])
     ).pack(side="left", padx=10)
 
     tb.Button(page_container, text="⬅ Quay lại", bootstyle="secondary",
               command=lambda: show_primary_window(root, page_container)).pack(pady=20)
 
-    render_medicine_list(root, medicine_frame, page_label, show_primary_window)
+    render_medicine_list(root, medicine_frame, page_label, show_primary_window, medicine_list=filtered_medicines["data"])
 
 
 def show_add_thuoc_window(root, page_container, show_primary_window):
