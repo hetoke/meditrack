@@ -5,7 +5,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('clinic.db', '.'), ('Quicksand-Regular.ttf', '.')],
+    datas=[],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

@@ -11,7 +11,17 @@ def fetch_records():
     session = get_session()
     records = session.query(HoSo).all()
     session.close()
-    return [(int(t.HoSoID), t.Ten, int(t.NamSinh), t.DiaChi, t.DienThoai, t.TienCan) for t in records]
+    return [
+        (
+            int(t.HoSoID),
+            t.Ten,
+            int(t.NamSinh) if t.NamSinh is not None else None,
+            t.DiaChi,
+            t.DienThoai,
+            t.TienCan,
+        )
+        for t in records
+    ]
 
 import unicodedata
 
@@ -204,12 +214,16 @@ def show_edit_ho_so_window(root, container, show_primary_window, hoso_id, record
     tiencan_entry.pack(fill="x", padx=10, pady=5)
 
     def save_changes():
+        year_value = year_entry.get().strip()
+        if year_value and not year_value.isdigit():
+            messagebox.showerror("Lỗi", "Năm sinh chỉ được nhập số.")
+            return
         session = get_session()
         # use session.get to load the row by primary key
         h = session.get(HoSo, hoso_id)
         if h:
             h.Ten = name_entry.get().strip()
-            h.NamSinh = int(year_entry.get()) if year_entry.get().strip().isdigit() else None
+            h.NamSinh = int(year_value) if year_value.isdigit() else None
             h.DiaChi = address_entry.get().strip()
             h.DienThoai = phone_entry.get().strip()
             h.TienCan = tiencan_entry.get("1.0", "end").strip()
@@ -286,6 +300,13 @@ def show_add_ho_so_window(root, page_container, show_primary_window):
         address = address_entry.get().strip()
         phone = phone_entry.get().strip()
         tiencan = tiencan_entry.get("1.0", "end").strip()
+
+        if not name:
+            messagebox.showerror("Lỗi", "Vui lòng nhập họ và tên.")
+            return
+        if not year or not year.isdigit():
+            messagebox.showerror("Lỗi", "Vui lòng nhập năm sinh hợp lệ (chỉ số).")
+            return
 
         if name:
             session = get_session()

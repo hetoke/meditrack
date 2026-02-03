@@ -1,0 +1,15 @@
+Beta v1.1
+Fix critical bug on record fetching as year must allow only numbers
+
+------------------------------------
+Bug in search medicine, enter after autocompleting does not apply the search
+Search by surname, year
+Responsive width or slider
+Default as latest prescription
+Duplicate prescription (nhân bản toa hiện tại)
+Fix date into datetime
+Prompt before return record list when forgot saving
+Delete labels Tiền căn, chuẩn đoán, no table header
+Zoom in, zoom out in prescription
+
+Will be in beta v1.2

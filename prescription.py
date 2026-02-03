@@ -3,6 +3,8 @@ import tkinter as tk
 from tkinter import messagebox
 from datetime import date
 
+from sqlalchemy.orm import selectinload
+
 from db import DonThuoc, ChiDinh, Thuoc
 from db_connect import get_session
 from intellisense import AutocompleteEntry
@@ -97,7 +99,15 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
     prescriptions = []
     current_index = {"value": 0}
     session = get_session()
-    donthuoc_list = session.query(DonThuoc).filter(DonThuoc.HoSoID == hoso_id).order_by(DonThuoc.NgayLap).all()
+    donthuoc_list = (
+        session.query(DonThuoc)
+        .options(selectinload(DonThuoc.chidinh_list).selectinload(ChiDinh.thuoc))
+        .filter(DonThuoc.HoSoID == hoso_id)
+        .order_by(DonThuoc.NgayLap)
+        .all()
+    )
+    session.expunge_all()
+    session.close()
 
     # --- Navigation bar first so functions can access it ---
     nav_frame = tb.Frame(content)
@@ -341,6 +351,11 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
                 session_local.add(chi)
         don_obj.TienToa = total_cost
         session_local.commit()
+        don_obj = session_local.get(
+            DonThuoc,
+            don_obj.DonThuocID,
+            options=[selectinload(DonThuoc.chidinh_list).selectinload(ChiDinh.thuoc)],
+        )
         p["donthuoc"] = don_obj
         date_text = don_obj.NgayLap.strftime("%Y-%m-%d") if don_obj.NgayLap else date.today().strftime("%Y-%m-%d")
         date_label.config(text=f"Ngày lập đơn thuốc: {date_text}")

@@ -38,7 +38,8 @@ class AutocompleteEntry(tk.Entry):
         for m in matches:
             self.listbox.insert("end", m)
 
-        self.listbox.bind("<<ListboxSelect>>", self.select_suggestion)
+        self.listbox.bind("<Double-Button-1>", self.select_suggestion)
+        self.listbox.bind("<Return>", self.select_suggestion)
 
         x = self.winfo_rootx() - self.winfo_toplevel().winfo_rootx()
         y = self.winfo_rooty() - self.winfo_toplevel().winfo_rooty() + self.winfo_height()
@@ -56,4 +57,4 @@ class AutocompleteEntry(tk.Entry):
             self.listbox.focus()
             self.listbox.selection_set(0)
             self.listbox.activate(0)
-            self.listbox.bind("<Return>", self.select_suggestion)
+            return "break"
