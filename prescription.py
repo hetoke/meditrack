@@ -4,85 +4,25 @@ import tkinter.font as tkfont
 from tkinter import messagebox
 from datetime import date, datetime
 
-from sqlalchemy.orm import object_session, selectinload
 
-from db import DonThuoc, ChiDinh, Thuoc
-from db_connect import get_session
+from services.prescription_service import (
+    safe_float,
+    format_currency,
+    format_ngaylap,
+    calculate_total_from_donthuoc,
+    fetch_prescriptions_by_hoso,
+    save_prescription,
+    delete_prescription_by_id,
+    fetch_thuoc_suggestions
+)
+
+from utils.tk_helpers import clear_parents
 from intellisense import AutocompleteEntry
+from ui.prescription.table import PrescriptionTable
 
 
-def fetch_prescriptions(hoso_id):
-    session = get_session()
-    donthuocs = (
-        session.query(DonThuoc)
-        .filter(DonThuoc.HoSoID == hoso_id)
-        .order_by(DonThuoc.NgayLap)
-        .all()
-    )
-    session.close()
-
-    # Return list of tuples (DonThuocID, NgayLap, MoTa, TienToa)
-    return [
-        (
-            int(d.DonThuocID),
-            d.NgayLap,
-            d.MoTa,
-            float(d.TienToa) if d.TienToa else 0.0,
-            [
-                (
-                    chi.TenThuoc,
-                    chi.SangTruocAn,
-                    chi.SangSauAn,
-                    chi.TruaTruocAn,
-                    chi.TruaSauAn,
-                    chi.ChieuTruocAn,
-                    chi.ChieuSauAn,
-                    chi.Toi,
-                )
-                for chi in d.chidinh_list
-            ],
-        )
-        for d in donthuocs
-    ]
 
 
-def safe_float(value):
-    try:
-        return float(value)
-    except Exception:
-        return 0.0
-
-
-def format_currency(value):
-    return f"{value:,.0f} đ"
-
-def ensure_donthuoc_loaded(donthuoc_obj):
-    if not donthuoc_obj:
-        return None
-    if "chidinh_list" in donthuoc_obj.__dict__:
-        return donthuoc_obj
-    if object_session(donthuoc_obj) is None:
-        don_id = getattr(donthuoc_obj, "DonThuocID", None)
-        if not don_id:
-            return donthuoc_obj
-        session = get_session()
-        try:
-            donthuoc_obj = session.get(
-                DonThuoc,
-                don_id,
-                options=[selectinload(DonThuoc.chidinh_list).selectinload(ChiDinh.thuoc)],
-            )
-            session.expunge_all()
-        finally:
-            session.close()
-    return donthuoc_obj
-
-def format_ngaylap(value):
-    if isinstance(value, datetime):
-        return value.strftime("%d/%m/%Y %H:%M:%S")
-    if isinstance(value, date):
-        return value.strftime("%d/%m/%Y 00:00:00")
-    return datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
 
 def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_primary_window):
@@ -116,11 +56,11 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
     content = tb.Frame(container, padding=20)
     content.pack(side="left", fill="both", expand=True)
 
-    # ---- Tiá»n cÄƒn ----
-    tiencan_box = tb.Labelframe(content, text="Tiền căn", padding=10)
-    tiencan_box.pack(fill="x", pady=(2, 4))
+    # ---- Tiền căn ----
+    tiencan_box = tb.Labelframe(sidebar, text="Tiền căn", padding=10)
+    tiencan_box.pack(fill="x", pady=(2, 4), expand=False)
 
-    tiencan_text = tk.Text(tiencan_box, height=3, wrap="word")
+    tiencan_text = tk.Text(tiencan_box, height=3, width=28, wrap="word")
     tiencan_text.pack(fill="x")
     if tiencan:
         tiencan_text.insert("1.0", tiencan)
@@ -130,16 +70,7 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
     # ============= PRESCRIPTIONS =============
     prescriptions = []
     current_index = {"value": 0}
-    session = get_session()
-    donthuoc_list = (
-        session.query(DonThuoc)
-        .options(selectinload(DonThuoc.chidinh_list).selectinload(ChiDinh.thuoc))
-        .filter(DonThuoc.HoSoID == hoso_id)
-        .order_by(DonThuoc.NgayLap)
-        .all()
-    )
-    session.expunge_all()
-    session.close()
+    donthuoc_list = fetch_prescriptions_by_hoso(hoso_id)
 
     # --- Navigation in sidebar ---
     sidebar_nav = tb.Frame(sidebar)
@@ -225,221 +156,37 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
     tb.Button(zoom_row, text="Thu nhỏ", command=lambda: zoom_table(-zoom_step)).pack(side="left", expand=True, fill="x", padx=(0, 2))
     tb.Button(zoom_row, text="Phóng to", command=lambda: zoom_table(zoom_step)).pack(side="left", expand=True, fill="x", padx=(2, 0))
 
-    # --- Helper: Build single prescription UI ---
-    def calculate_total_from_donthuoc(donthuoc_obj):
-        total = 0.0
-        donthuoc_obj = ensure_donthuoc_loaded(donthuoc_obj)
-        if not donthuoc_obj:
-            return total
-        for chi in donthuoc_obj.chidinh_list:
-            price = float(chi.thuoc.Gia or 0) if chi.thuoc else 0.0
-            dose = (
-                safe_float(chi.SangTruocAn)
-                + safe_float(chi.SangSauAn)
-                + safe_float(chi.TruaTruocAn)
-                + safe_float(chi.TruaSauAn)
-                + safe_float(chi.ChieuTruocAn)
-                + safe_float(chi.ChieuSauAn)
-                + safe_float(chi.Toi)
-            )
-            total += dose * price
-        return total
+    
 
-    def build_prescription(donthuoc_obj=None, seed_rows=None, seed_chandoan=None):
-        frame = tb.Frame(content, padding=10)
-        prescriptions.append({
-            "frame": frame,
-            "donthuoc": donthuoc_obj,
-            "entries": [],
-            "chandoan_text": None,
-            "grid_frame": None,
-            "zoom": 1.0,
-            "row_count": 0,
-            "dirty": False,
-        })
-        p = prescriptions[-1]
-
-        # ---- Chuáº©n Ä‘oÃ¡n ----
-        chandoan_box = tb.Labelframe(frame, text="Chuẩn đoán", padding=10)
-        chandoan_box.pack(fill="x", pady=(2, 4))
-        chandoan_text = tk.Text(chandoan_box, height=3, wrap="word")
-        chandoan_text.pack(fill="x")
-        if donthuoc_obj:
-            chandoan_text.insert("1.0", donthuoc_obj.MoTa)
-        elif seed_chandoan:
-            chandoan_text.insert("1.0", seed_chandoan)
-            p["dirty"] = True
-
-        def mark_dirty(*_):
-            p["dirty"] = True
-
-        def on_text_modified(event):
-            w = event.widget
-            if w.edit_modified():
-                mark_dirty()
-                w.edit_modified(False)
-
-        # ---- Prescription Table ----
-        columns = ["Thuốc", "Sáng trước ăn", "Sáng sau ăn", "Trưa trước ăn",
-                    "Trưa sau ăn", "Chiều trước ăn", "Chiều sau ăn", "Tối"]
-        sau_an_indices = {2, 4, 6}
-        col_widths = [22, 12, 12, 12, 12, 12, 12, 12]
-        p["col_widths"] = col_widths
-
-        table_outer = tb.Frame(frame)
-        table_outer.pack(fill="both", expand=True, padx=20, pady=(2, 6))
-
-        canvas = tk.Canvas(table_outer)
-        vsb = tb.Scrollbar(table_outer, orient="vertical", command=canvas.yview)
-        canvas.configure(yscrollcommand=vsb.set)
-        vsb.pack(side="right", fill="y")
-        canvas.pack(side="left", fill="both", expand=True)
-
-        grid_frame = tb.Frame(canvas)
-        canvas.create_window((0, 0), window=grid_frame, anchor="nw")
-        p["grid_frame"] = grid_frame
-
-        resize_state = {"col": None, "start_x": 0, "start_w": 0}
-
-        def cell_motion(event, col):
-            w = event.widget
-            if w.winfo_width() - event.x <= 6:
-                w.configure(cursor="sb_h_double_arrow")
-            else:
-                w.configure(cursor="")
-
-        def start_resize(event, col):
-            w = event.widget
-            if w.winfo_width() - event.x <= 6:
-                resize_state["col"] = col
-                resize_state["start_x"] = event.x_root
-                resize_state["start_w"] = w.winfo_width()
-                w.configure(cursor="sb_h_double_arrow")
-            else:
-                resize_state["col"] = None
-
-        def do_resize(event, col):
-            if resize_state["col"] != col:
-                return
-            dx = event.x_root - resize_state["start_x"]
-            new_px = max(40, resize_state["start_w"] + dx)
-            font = tkfont.nametofont("TkDefaultFont")
-            char_w = max(1, font.measure("0"))
-            col_widths[col] = max(5, int(round(new_px / char_w)))
-            p["col_widths"] = col_widths
-            apply_table_zoom(p)
-
-        def stop_resize(event, col):
-            if resize_state["col"] == col:
-                resize_state["col"] = None
-            event.widget.configure(cursor="")
-
-        entries = []
-        p["row_count"] = 0
-        apply_table_zoom(p)
-
-        def add_row(row_values=None):
-            row_index = len(entries) + 1
-            row_entries = []
-            vals = row_values if row_values else ("",) * len(columns)
-
-            for c in range(len(columns)):
-                v = vals[c] if c < len(vals) else ""
-                if c == 0:
-                    # This works but would be lethal if there is too much thuoc
-                    all_meds = lambda query: [
-                        t.Ten for t in session.query(Thuoc).filter(Thuoc.Ten.ilike(f"{query}%")).all()
-                    ]
-                    e = AutocompleteEntry(grid_frame, fetch_suggestions=all_meds, width=col_widths[c])
-                else:
-                    e = tk.Entry(grid_frame, width=col_widths[c])
-                e.insert(0, v)
-                if v:
-                    p["dirty"] = True
-                if c in sau_an_indices:
-                    e.config(bg="#FFC107")
-                e.grid(row=row_index, column=c, sticky="nsew", padx=1, pady=1)
-                e.bind("<KeyRelease>", mark_dirty)
-                e.bind("<FocusOut>", mark_dirty)
-                e.bind("<Motion>", lambda ev, col=c: cell_motion(ev, col))
-                e.bind("<Button-1>", lambda ev, col=c: start_resize(ev, col))
-                e.bind("<B1-Motion>", lambda ev, col=c: do_resize(ev, col))
-                e.bind("<ButtonRelease-1>", lambda ev, col=c: stop_resize(ev, col))
-                row_entries.append(e)
-
-            entries.append(row_entries)
-            p["row_count"] = len(entries)
-
-            def delete_row():
-                for e in row_entries + [btn]:
-                    e.destroy()
-                if row_entries in entries:
-                    entries.remove(row_entries)
-                p["row_count"] = len(entries)
-                p["dirty"] = True
-                grid_frame.update_idletasks()
-                canvas.config(scrollregion=canvas.bbox("all"))
-
-            btn = tb.Button(grid_frame, text="X", bootstyle="danger", command=delete_row)
-            btn.grid(row=row_index, column=len(columns), sticky="nsew", padx=1, pady=1)
-
-            apply_table_zoom(prescriptions[-1])
-
-            grid_frame.update_idletasks()
-            canvas.config(scrollregion=canvas.bbox("all"))
-
-        # Populate rows from DB / seed data
-        if donthuoc_obj and donthuoc_obj.chidinh_list:
-            for chi in donthuoc_obj.chidinh_list:
-                name = chi.thuoc.Ten if chi.thuoc else "(Thuốc không tồn tại)"
-                add_row([
-                    name,
-                    chi.SangTruocAn or "",
-                    chi.SangSauAn or "",
-                    chi.TruaTruocAn or "",
-                    chi.TruaSauAn or "",
-                    chi.ChieuTruocAn or "",
-                    chi.ChieuSauAn or "",
-                    chi.Toi or "",
-                ])
-        elif seed_rows:
-            for row in seed_rows:
-                add_row(row)
-        else:
-            add_row()
-
-        tb.Button(frame, text="Thêm dòng", bootstyle="success",
-                  command=lambda: add_row()).pack(anchor="e", pady=5)
-
-        chandoan_text.bind("<<Modified>>", on_text_modified)
-        prescriptions[-1]["chandoan_text"] = chandoan_text
-        prescriptions[-1]["entries"] = entries
-        prescriptions[-1]["add_row"] = add_row
-
-        return frame
+    
 
     delete_btn = None
 
     # --- Navigation / CRUD functions ---
     def show_prescription(index):
-        for p in prescriptions:
-            p["frame"].pack_forget()
-        prescriptions[index]["frame"].pack(fill="both", expand=True)
+        for t in prescriptions:
+            t.pack_forget()
+
+        t = prescriptions[index]
+        t.pack(fill="both", expand=True)
         current_index["value"] = index
+
         nav_label.config(text=f"Đơn {index+1}/{len(prescriptions)}")
-        don_obj = prescriptions[index]["donthuoc"]
-        if don_obj and don_obj.NgayLap:
-            date_text = format_ngaylap(don_obj.NgayLap)
-            date_label.config(text=f"Ngày lập đơn thuốc: {date_text}")
+
+        if t.donthuoc and t.donthuoc.NgayLap:
+            date_label.config(
+                text=f"Ngày lập đơn thuốc: {format_ngaylap(t.donthuoc.NgayLap)}"
+            )
         else:
             date_label.config(text="")
-        total_value = calculate_total_from_donthuoc(prescriptions[index]["donthuoc"])
-        sidebar_total_label.config(text=f"Tổng tiền: {format_currency(total_value)}")
+
+        total_value = calculate_total_from_donthuoc(t.donthuoc)
+        sidebar_total_label.config(
+            text=f"Tổng tiền: {format_currency(total_value)}"
+        )
+
         prev_btn.config(state=("disabled" if index == 0 else "normal"))
         next_btn.config(state=("disabled" if index == len(prescriptions)-1 else "normal"))
-        if delete_btn:
-            delete_btn.config(state=("disabled" if len(prescriptions) <= 1 else "normal"))
-        apply_table_zoom(prescriptions[index])
 
     def next_prescription():
         if current_index["value"] < len(prescriptions) - 1:
@@ -450,123 +197,99 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
             show_prescription(current_index["value"] - 1)
 
     def add_prescription():
-        build_prescription()
+        t = PrescriptionTable(content)
+        prescriptions.append(t)
         show_prescription(len(prescriptions) - 1)
 
     def duplicate_prescription():
         if not prescriptions:
             return
+
         src = prescriptions[current_index["value"]]
-        chandoan = src["chandoan_text"].get("1.0", "end").strip() if src.get("chandoan_text") else ""
-        rows = []
-        for row in src.get("entries", []):
-            vals = [e.get() for e in row]
-            if any(v.strip() for v in vals):
-                rows.append(vals)
-        build_prescription(seed_rows=rows if rows else None, seed_chandoan=chandoan)
-        prescriptions[-1]["dirty"] = True
+
+        chandoan = src.chandoan_text.get("1.0", "end").strip()
+        rows = [[e.get() for e in row] for row in src.entries]
+
+        t = PrescriptionTable(
+            content,
+            seed_rows=rows,
+            seed_chandoan=chandoan
+        )
+        t.dirty = True
+        prescriptions.append(t)
+
         show_prescription(len(prescriptions) - 1)
 
     def delete_prescription(index):
-        if not prescriptions or index < 0 or index >= len(prescriptions):
-            return
-        p = prescriptions[index]
-        if p.get("dirty"):
+        t = prescriptions[index]
+
+        if t.dirty:
             if not messagebox.askyesno("Chưa lưu", "Đơn thuốc này có thay đổi chưa lưu. Xoá vẫn tiếp tục?"):
                 return
-        if not messagebox.askyesno("Xác nhận", "Bạn có chắc chắn muốn xoá đơn thuốc này?"):
-            return
-        don_obj = p.get("donthuoc")
-        if don_obj:
-            session_local = get_session()
-            don_obj = session_local.get(DonThuoc, don_obj.DonThuocID)
-            if don_obj:
-                for chi in list(don_obj.chidinh_list):
-                    session_local.delete(chi)
-                session_local.delete(don_obj)
-                session_local.commit()
-            session_local.close()
-        p["frame"].destroy()
+
+        if t.donthuoc:
+            delete_prescription_by_id(t.donthuoc.DonThuocID)
+
+        t.frame.destroy()
         prescriptions.pop(index)
+
         if prescriptions:
-            show_prescription(min(index, len(prescriptions)-1))
+            show_prescription(min(index, len(prescriptions) - 1))
         else:
-            build_prescription()
+            new_t = PrescriptionTable(content)
+            prescriptions.append(new_t)
             show_prescription(0)
 
+    def collect_prescription_rows(entries):
+        rows = []
+        for row in entries:
+            values = [e.get().strip() for e in row]
+            if any(values):
+                rows.append(values)
+        return rows
+
     def save_current_prescription():
-        session_local = get_session()
-        p = prescriptions[current_index["value"]]
-        don_obj = p["donthuoc"]
-        if don_obj is None:
-            don_obj = DonThuoc(HoSoID=hoso_id, NgayLap=datetime.now())
-        don_obj.MoTa = p["chandoan_text"].get("1.0", "end").strip()
-        don_obj = session_local.merge(don_obj)
-        session_local.commit()
+        if not prescriptions:
+            return
 
-        # Clear old ChiDinh
-        for chi in list(don_obj.chidinh_list):
-            session_local.delete(chi)
-        session_local.commit()
+        try:
+            t = prescriptions[current_index["value"]]
+            rows = collect_prescription_rows(t.entries)
 
-        total_cost = 0.0
-        # Save new ChiDinh
-        for row in p["entries"]:
-            if any(e.get() for e in row):
-                name = row[0].get().strip()
-                thuoc_obj = session_local.query(Thuoc).filter(Thuoc.Ten == name).first()
-                if not thuoc_obj:
-                    messagebox.showerror("Lỗi", f"Thuốc '{name}' không tồn tại")
-                    return
-                price = float(thuoc_obj.Gia or 0)
-                dose = (
-                    safe_float(row[1].get() or 0)
-                    + safe_float(row[2].get() or 0)
-                    + safe_float(row[3].get() or 0)
-                    + safe_float(row[4].get() or 0)
-                    + safe_float(row[5].get() or 0)
-                    + safe_float(row[6].get() or 0)
-                    + safe_float(row[7].get() or 0)
-                )
-                total_cost += dose * price
-                chi = ChiDinh(
-                    DonThuocID=don_obj.DonThuocID,
-                    ThuocID=thuoc_obj.ThuocID,
-                    SangTruocAn=float(row[1].get() or 0),
-                    SangSauAn=float(row[2].get() or 0),
-                    TruaTruocAn=float(row[3].get() or 0),
-                    TruaSauAn=float(row[4].get() or 0),
-                    ChieuTruocAn=float(row[5].get() or 0),
-                    ChieuSauAn=float(row[6].get() or 0),
-                    Toi=float(row[7].get() or 0),
-                )
-                session_local.add(chi)
-        don_obj.TienToa = total_cost
-        session_local.commit()
-        don_obj = session_local.get(
-            DonThuoc,
-            don_obj.DonThuocID,
-            options=[selectinload(DonThuoc.chidinh_list).selectinload(ChiDinh.thuoc)],
-        )
-        p["donthuoc"] = don_obj
+            don_obj, total_cost = save_prescription(
+                hoso_id,
+                t.donthuoc,
+                t.chandoan_text.get("1.0", "end").strip(),
+                rows,
+            )
+            t.donthuoc = don_obj
+            t.dirty = False
+        except ValueError as e:
+            messagebox.showerror("Lỗi", str(e))
+            return
+
+        t.donthuoc = don_obj
+        t.dirty = False
+
         if don_obj and don_obj.NgayLap:
-            date_text = format_ngaylap(don_obj.NgayLap)
-            date_label.config(text=f"Ngày lập đơn thuốc: {date_text}")
-        else:
-            date_label.config(text="")
-        sidebar_total_label.config(text=f"Tổng tiền: {format_currency(total_cost)}")
-        session_local.close()
+            date_label.config(
+                text=f"Ngày lập đơn thuốc: {format_ngaylap(don_obj.NgayLap)}"
+            )
+
+        sidebar_total_label.config(
+            text=f"Tổng tiền: {format_currency(total_cost)}"
+        )
+
         messagebox.showinfo("Thông báo", "Đã lưu đơn thuốc thành công!")
-        p["dirty"] = False
 
     # --- Build prescriptions from DB ---
     for don in donthuoc_list:
-        build_prescription(don)
+        prescriptions.append(PrescriptionTable(content, don))
+
     if not prescriptions:
-        build_prescription()
-        show_prescription(0)
-    else:
-        show_prescription(len(prescriptions) - 1)
+        prescriptions.append(PrescriptionTable(content))
+
+    show_prescription(0)
 
     # --- Connect navigation buttons ---
     prev_btn.config(command=prev_prescription)
@@ -587,7 +310,7 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
 
     # --- Back button ---
     def confirm_back():
-        if any(p.get("dirty") for p in prescriptions):
+        if any(p.dirty for p in prescriptions):
             if not messagebox.askyesno("Chưa lưu", "Bạn có thay đổi chưa lưu. Quay lại mà không lưu?"):
                 return
         show_ho_so_window(root, container, show_primary_window)
@@ -598,14 +321,3 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
         bootstyle="secondary",
         command=confirm_back,
     ).pack(pady=20)
-
-
-def clear_parents(widget, stop_at=None, levels=2):
-    parent = widget
-    for _ in range(levels - 1):
-        if parent.master == stop_at or parent.master is None:
-            break
-        parent = parent.master
-    for w in parent.winfo_children():
-        w.destroy()
-    return parent

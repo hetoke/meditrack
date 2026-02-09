@@ -2,6 +2,8 @@ Beta v1.1
 Fix critical bug on record fetching as year must allow only numbers
 
 ------------------------------------
+Beta v1.2
+
 Remove table header [resolved]
 Fix date into datetime [resolved]
 Default as latest prescription [resolved]
@@ -16,4 +18,13 @@ Fixing deleting prescription without saving bug [resolved]
 
 
 
-Will be in beta v1.2
+Beta v1.3
+
+Move Tiền căn box into the sidebar (resolved)
+Updating pagination to record list (15 items per page, show name, year and last modified timestamp)
+Sorting latest record at the top of the list
+Make prescription table fit horizontally by default
+Allow swapping prescription rows up or down option
+Allow Enter key to go the next box in prescription table (double Enter on medicine name field)
+
+

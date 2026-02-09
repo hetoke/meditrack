@@ -2,8 +2,8 @@ import ttkbootstrap as tb
 import tkinter as tk
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from db import Thuoc  
-from db_connect import get_session 
+from db.models import Thuoc  
+from db.session import get_session 
 from intellisense import AutocompleteEntry
 
 

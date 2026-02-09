@@ -3,7 +3,7 @@ import ttkbootstrap as tb
 from tkinter import font as tkfont, messagebox
 from ctypes import windll
 from medicine import show_thuoc_window
-from record import show_ho_so_window
+from ui.record.screen import show_ho_so_window
 import traceback
 import sys
 
