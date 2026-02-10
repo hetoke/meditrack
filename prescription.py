@@ -242,10 +242,22 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
 
     def collect_prescription_rows(entries):
         rows = []
+
         for row in entries:
-            values = [e.get().strip() for e in row]
+            # row is a dict with key "entries"
+            cells = row["entries"]
+
+            values = []
+            for e in cells:
+                if hasattr(e, "get"):
+                    values.append(e.get().strip())
+                else:
+                    values.append(str(e).strip())
+
+            #print(values)
             if any(values):
                 rows.append(values)
+
         return rows
 
     def save_current_prescription():
@@ -256,11 +268,12 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
             t = prescriptions[current_index["value"]]
             rows = collect_prescription_rows(t.entries)
 
+
             don_obj, total_cost = save_prescription(
                 hoso_id,
                 t.donthuoc,
                 t.chandoan_text.get("1.0", "end").strip(),
-                rows,
+                entry_rows=rows,
             )
             t.donthuoc = don_obj
             t.dirty = False
@@ -289,7 +302,7 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
     if not prescriptions:
         prescriptions.append(PrescriptionTable(content))
 
-    show_prescription(0)
+    show_prescription(len(prescriptions) - 1)
 
     # --- Connect navigation buttons ---
     prev_btn.config(command=prev_prescription)

@@ -17,7 +17,7 @@ class PrescriptionTable:
 
         self.grid_frame = None
         self.row_count = 0
-        self.col_widths = [22, 12, 12, 12, 12, 12, 12, 12]
+        self.col_widths = [22, 6, 6, 6, 6, 6, 6, 6]
 
         self._build_chandoan(seed_chandoan)
         self._build_table(seed_rows)
@@ -61,16 +61,7 @@ class PrescriptionTable:
     # -------------------------------------------------
 
     def _build_table(self, seed_rows=None):
-        columns = [
-            "Thuốc",
-            "Sáng trước ăn",
-            "Sáng sau ăn",
-            "Trưa trước ăn",
-            "Trưa sau ăn",
-            "Chiều trước ăn",
-            "Chiều sau ăn",
-            "Tối",
-        ]
+        columns = ["Thuốc", "Sáng trước ăn", "Sáng sau ăn", "Trưa trước ăn", "Trưa sau ăn", "Chiều trước ăn", "Chiều sau ăn", "Tối"]
         sau_an_indices = {2, 4, 6}
 
         table_outer = tb.Frame(self.frame)
@@ -86,6 +77,49 @@ class PrescriptionTable:
         self.grid_frame = tb.Frame(canvas)
         window_id = canvas.create_window((0, 0), window=self.grid_frame, anchor="nw")
 
+        for c in range(len(columns)):
+            self.grid_frame.columnconfigure(c * 2, minsize=40)
+
+        EDGE_THRESHOLD = 6  # pixels
+
+        def on_cell_motion(event, col):
+            widget = event.widget
+            x = event.x
+
+            if widget.winfo_width() - x <= EDGE_THRESHOLD:
+                widget.config(cursor="sb_h_double_arrow")
+            else:
+                widget.config(cursor="")
+
+        def on_cell_press(event, col):
+            widget = event.widget
+            if widget.winfo_width() - event.x <= EDGE_THRESHOLD:
+                self._resize_col = col
+                self._resize_start_x = event.x_root
+                self._resize_start_width = self.col_widths[col]
+
+        def on_cell_drag(event):
+            if self._resize_col is None:
+                return
+
+            dx = event.x_root - self._resize_start_x
+            char_delta = dx // 6
+            new_width = max(4, self._resize_start_width + char_delta)
+
+            self.col_widths[self._resize_col] = new_width
+            apply_column_width(self._resize_col)
+
+        def on_cell_release(event):
+            self._resize_col = None
+
+
+        def apply_column_width(col):
+            w = self.col_widths[col]
+            for row in self.entries:
+                row["entries"][col].config(width=w)
+
+
+
         def on_canvas_configure(event):
             canvas.itemconfigure(window_id, width=event.width)
 
@@ -95,29 +129,24 @@ class PrescriptionTable:
         canvas.bind("<Configure>", on_canvas_configure)
         self.grid_frame.bind("<Configure>", on_frame_configure)
 
-        # ---- Header row ----
-        for c, name in enumerate(columns):
-            lbl = tb.Label(
-                self.grid_frame,
-                text=name,
-                anchor="center",
-                font=("Quicksand", 11, "bold"),
-            )
-            if c in sau_an_indices:
-                lbl.config(background="#FFC107")
-            lbl.grid(row=0, column=c, sticky="nsew", padx=1, pady=1)
 
-        tb.Label(
-            self.grid_frame,
-            text="Xóa",
-            anchor="center",
-            font=("Quicksand", 11, "bold"),
-        ).grid(row=0, column=len(columns), sticky="nsew", padx=1, pady=1)
+
 
         # ---- Row logic ----
+        def get_row_index(row_obj):
+            return self.entries.index(row_obj)
+
+        def refresh_grid():
+            for i, row in enumerate(self.entries):
+                for c, e in enumerate(row["entries"]):
+                    e.grid(row=i, column=c * 2, sticky="nsew", padx=1, pady=1)
+                base = len(columns) * 2
+
+                row["btn_del"].grid(row=i, column=base)
+                row["btn_up"].grid(row=i, column=base + 1)
+                row["btn_down"].grid(row=i, column=base + 2)
 
         def add_row(values=None):
-            row_idx = len(self.entries) + 1
             row_entries = []
             values = values or [""] * len(columns)
 
@@ -139,31 +168,78 @@ class PrescriptionTable:
                 if c in sau_an_indices:
                     e.config(bg="#FFC107")
 
-                e.grid(row=row_idx, column=c, sticky="nsew", padx=1, pady=1)
                 e.bind("<KeyRelease>", lambda *_: self._mark_dirty())
                 e.bind("<FocusOut>", lambda *_: self._mark_dirty())
+                e.bind("<Motion>", lambda ev, col=c: on_cell_motion(ev, col))
+                e.bind("<Button-1>", lambda ev, col=c: on_cell_press(ev, col))
+                e.bind("<B1-Motion>", on_cell_drag)
+                e.bind("<ButtonRelease-1>", on_cell_release)
 
                 row_entries.append(e)
 
-            def delete_row():
-                for w in row_entries + [btn]:
-                    w.destroy()
-                if row_entries in self.entries:
-                    self.entries.remove(row_entries)
-                self.dirty = True
-                canvas.update_idletasks()
-                canvas.configure(scrollregion=canvas.bbox("all"))
+            row_obj = {"entries": row_entries}
 
-            btn = tb.Button(
+            btn_del = tb.Button(
                 self.grid_frame,
                 text="X",
                 bootstyle="danger",
-                command=delete_row,
+                command=lambda ro=row_obj: delete_row(ro),
             )
-            btn.grid(row=row_idx, column=len(columns), sticky="nsew", padx=1, pady=1)
 
-            self.entries.append(row_entries)
+            btn_up = tb.Button(
+                self.grid_frame,
+                text="▲",
+                width=2,
+                command=lambda ro=row_obj: swap_rows(
+                    get_row_index(ro),
+                    get_row_index(ro) - 1
+                ),
+            )
 
+            btn_down = tb.Button(
+                self.grid_frame,
+                text="▼",
+                width=2,
+                command=lambda ro=row_obj: swap_rows(
+                    get_row_index(ro),
+                    get_row_index(ro) + 1
+                ),
+            )
+
+            row_obj.update({
+                "btn_del": btn_del,
+                "btn_up": btn_up,
+                "btn_down": btn_down,
+            })
+
+            self.entries.append(row_obj)
+            refresh_grid()
+
+
+            def delete_row(row_obj):
+                idx = get_row_index(row_obj)
+                for w in row_obj["entries"] + [
+                    row_obj["btn_del"],
+                    row_obj["btn_up"],
+                    row_obj["btn_down"],
+                ]:
+                    w.destroy()
+                self.entries.pop(idx)
+                refresh_grid()
+                self._mark_dirty()
+
+            def swap_rows(i, j):
+                if i < 0 or j < 0 or i >= len(self.entries) or j >= len(self.entries):
+                    return
+                self.entries[i], self.entries[j] = self.entries[j], self.entries[i]
+                refresh_grid()
+                self._mark_dirty()
+
+
+
+            
+
+            
             canvas.update_idletasks()
             canvas.configure(scrollregion=canvas.bbox("all"))
 

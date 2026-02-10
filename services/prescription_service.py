@@ -74,6 +74,17 @@ def delete_prescription_by_id(donthuoc_id):
     finally:
         session.close()
 
+def normalize_cells(row):
+    # dict row from new UI
+    if isinstance(row, dict):
+        row = row.get("entries", row)
+
+    # list of Entry widgets
+    if row and hasattr(row[0], "get"):
+        return [e.get().strip() for e in row]
+
+    # already list of strings
+    return [str(v).strip() for v in row]
 
 def save_prescription(
     hoso_id,
@@ -104,36 +115,31 @@ def save_prescription(
         total_cost = 0.0
 
         for row in entry_rows:
-            if not any(str(v).strip() for v in row):
+            values = normalize_cells(row)
+
+            if not any(values):
                 continue
 
-            name = row[0].strip()
+            name = values[0]
             thuoc_obj = session.query(Thuoc).filter(Thuoc.Ten == name).first()
             if not thuoc_obj:
                 raise ValueError(f"Thuốc '{name}' không tồn tại")
 
             price = float(thuoc_obj.Gia or 0)
-            dose = (
-                safe_float(row[1])
-                + safe_float(row[2])
-                + safe_float(row[3])
-                + safe_float(row[4])
-                + safe_float(row[5])
-                + safe_float(row[6])
-                + safe_float(row[7])
-            )
-            total_cost += dose * price
+
+            doses = [safe_float(v) for v in values[1:8]]
+            total_cost += sum(doses) * price
 
             chi = ChiDinh(
                 DonThuocID=donthuoc_obj.DonThuocID,
                 ThuocID=thuoc_obj.ThuocID,
-                SangTruocAn=safe_float(row[1]),
-                SangSauAn=safe_float(row[2]),
-                TruaTruocAn=safe_float(row[3]),
-                TruaSauAn=safe_float(row[4]),
-                ChieuTruocAn=safe_float(row[5]),
-                ChieuSauAn=safe_float(row[6]),
-                Toi=safe_float(row[7]),
+                SangTruocAn=doses[0],
+                SangSauAn=doses[1],
+                TruaTruocAn=doses[2],
+                TruaSauAn=doses[3],
+                ChieuTruocAn=doses[4],
+                ChieuSauAn=doses[5],
+                Toi=doses[6],
             )
             session.add(chi)
 
