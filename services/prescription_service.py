@@ -1,6 +1,6 @@
 # services/prescription_service.py
 from datetime import date, datetime
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 
 from db.models import DonThuoc, ChiDinh, Thuoc
 from db.session import get_session
@@ -49,14 +49,14 @@ def calculate_total_from_donthuoc(donthuoc_obj):
 def fetch_prescriptions_by_hoso(hoso_id):
     session = get_session()
     try:
-        donthuoc_list = (
+        prescriptions = (
             session.query(DonThuoc)
-            .options(selectinload(DonThuoc.chidinh_list).selectinload(ChiDinh.thuoc))
+            .options(joinedload(DonThuoc.chidinh_list).joinedload(ChiDinh.thuoc))
             .filter(DonThuoc.HoSoID == hoso_id)
             .order_by(DonThuoc.NgayLap)
             .all()
         )
-        return donthuoc_list
+        return prescriptions
     finally:
         session.close()
 

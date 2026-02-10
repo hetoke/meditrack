@@ -21,10 +21,11 @@ Fixing deleting prescription without saving bug [resolved]
 Beta v1.3
 
 Move Tiền căn box into the sidebar (resolved)
-Updating pagination to record list (15 items per page, show name, year and last modified timestamp)
-Sorting latest record at the top of the list
-Make prescription table fit horizontally by default (resolved by decrease column size)
-Allow swapping prescription rows up or down option
+Updating pagination to record list (15 items per page, show name, year and last modified timestamp, fallback at record creation date) (resolved)
+Sorting latest record at the top of the list (resolved)
+Make prescription table fit horizontally by default (resolved by decrease column size) 
+Allow swapping prescription rows up or down option (resolved)
 Allow Enter key to go the next box in prescription table (double Enter on medicine name field)
+Check dirty exit on only current prescription (resolved)
 
 

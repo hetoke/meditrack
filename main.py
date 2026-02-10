@@ -58,6 +58,71 @@ def main():
     container = tb.Frame(root)
     container.pack(fill="both", expand=True)
 
+    style = tb.Style()
+
+    # --- COMPACT INFO OUTLINE ---
+    style.configure(
+        "CompactInfo.TButton",
+        font=("Quicksand", 9),
+        padding=(5, 0),
+        anchor="center",
+        relief="solid",
+        borderwidth=1,
+        background=style.colors.bg,  # white
+        focuscolor=style.colors.info,
+    )
+    style.map(
+        "CompactInfo.TButton",
+        foreground=[
+            ("pressed", "#ffffff"),
+            ("active", "#ffffff"),  # white text on hover
+            ("!disabled", style.colors.info),
+        ],
+        background=[
+            ("pressed", style.colors.info),
+            ("active", style.colors.info),  # info color background on hover
+            ("!disabled", style.colors.bg),
+        ],
+        bordercolor=[
+            ("pressed", style.colors.info),
+            ("active", style.colors.info),
+            ("!disabled", style.colors.info),
+        ],
+    )
+
+    # --- COMPACT DANGER OUTLINE ---
+    style.configure(
+        "CompactDanger.TButton",
+        font=("Quicksand", 9),
+        padding=(5, 0),
+        anchor="center",
+        relief="solid",
+        borderwidth=1,
+        background=style.colors.bg,
+        focuscolor=style.colors.danger,
+    )
+    style.map(
+        "CompactDanger.TButton",
+        foreground=[
+            ("pressed", "#ffffff"),
+            ("active", "#ffffff"),  # white text on hover
+            ("!disabled", style.colors.danger),
+        ],
+        background=[
+            ("pressed", style.colors.danger),
+            ("active", style.colors.danger),  # danger color background on hover
+            ("!disabled", style.colors.bg),
+        ],
+        bordercolor=[
+            ("pressed", style.colors.danger),
+            ("active", style.colors.danger),
+            ("!disabled", style.colors.danger),
+        ],
+    )
+
+
+
+
     # Load the home screen first
     show_primary_window(root, container)
 

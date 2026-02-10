@@ -3,7 +3,8 @@ from datetime import date
 import unicodedata
 import re
 
-from db.models import HoSo
+from sqlalchemy import func
+from db.models import HoSo, DonThuoc
 from db.session import get_session
 
 
@@ -12,18 +13,65 @@ from db.session import get_session
 # -------------------------
 def fetch_records():
     session = get_session()
-    records = session.query(HoSo).all()
+
+    # 1️⃣ Subquery: latest NgayLap per HoSo
+    latest_donthuoc = (
+        session.query(
+            DonThuoc.HoSoID.label("hoso_id"),
+            func.max(DonThuoc.NgayLap).label("latest_ngaylap"),
+        )
+        .group_by(DonThuoc.HoSoID)
+        .subquery()
+    )
+
+    # 2️⃣ Main query: LEFT JOIN subquery
+    rows = (
+        session.query(
+            HoSo.HoSoID,
+            HoSo.Ten,
+            HoSo.NamSinh,
+            HoSo.DiaChi,
+            HoSo.DienThoai,
+            HoSo.TienCan,
+            func.coalesce(
+                latest_donthuoc.c.latest_ngaylap,
+                HoSo.NgayMoHoSo
+            ).label("last_modified"),
+        )
+        .outerjoin(
+            latest_donthuoc,
+            latest_donthuoc.c.hoso_id == HoSo.HoSoID
+        )
+        .order_by(
+            func.coalesce(
+                latest_donthuoc.c.latest_ngaylap,
+                HoSo.NgayMoHoSo
+            ).desc()
+        )
+        .all()
+    )
+
     session.close()
+
     return [
         (
-            int(t.HoSoID),
-            t.Ten,
-            int(t.NamSinh) if t.NamSinh is not None else None,
-            t.DiaChi,
-            t.DienThoai,
-            t.TienCan,
+            int(hoso_id),
+            ten,
+            int(namsinh) if namsinh is not None else None,
+            diachi,
+            dienthoai,
+            tiencan,
+            last_modified,
         )
-        for t in records
+        for (
+            hoso_id,
+            ten,
+            namsinh,
+            diachi,
+            dienthoai,
+            tiencan,
+            last_modified,
+        ) in rows
     ]
 
 

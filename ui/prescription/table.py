@@ -80,6 +80,8 @@ class PrescriptionTable:
         for c in range(len(columns)):
             self.grid_frame.columnconfigure(c * 2, minsize=40)
 
+
+
         EDGE_THRESHOLD = 6  # pixels
 
         def on_cell_motion(event, col):
@@ -130,7 +132,17 @@ class PrescriptionTable:
         self.grid_frame.bind("<Configure>", on_frame_configure)
 
 
+        def focus_cell(row_idx, col_idx):
+            if row_idx < 0:
+                return
 
+            # add new row if needed
+            if row_idx >= len(self.entries):
+                add_row()
+
+            row = self.entries[row_idx]
+            if col_idx < len(row["entries"]):
+                row["entries"][col_idx].focus_set()
 
         # ---- Row logic ----
         def get_row_index(row_obj):
@@ -213,8 +225,39 @@ class PrescriptionTable:
             })
 
             self.entries.append(row_obj)
-            refresh_grid()
 
+            def make_on_enter(row_obj, col):
+                def on_enter(event):
+                    row_idx = get_row_index(row_obj)
+
+                    # Medicine column (autocomplete handling)
+                    if col == 0:
+                        widget = event.widget
+                        
+                        # If autocomplete is showing
+                        if widget.listbox_visible and widget.listbox:
+                            # Select from listbox and close it
+                            widget.select_suggestion()
+                            # Move to next cell after brief delay
+                            widget.after(50, lambda: focus_cell(row_idx, 1))
+                            return "break"
+                        
+                        # No autocomplete visible, move to next cell immediately
+                        focus_cell(row_idx, 1)
+                        return "break"
+
+                    # Normal columns (not medicine)
+                    next_col = col + 1
+                    if next_col < len(columns):
+                        # Move to next column in same row
+                        focus_cell(row_idx, next_col)
+                    else:
+                        # Last column → create new row and focus on medicine cell
+                        focus_cell(row_idx + 1, 0)
+
+                    return "break"
+
+                return on_enter
 
             def delete_row(row_obj):
                 idx = get_row_index(row_obj)
@@ -235,10 +278,17 @@ class PrescriptionTable:
                 refresh_grid()
                 self._mark_dirty()
 
+            # **BIND THE ENTER KEY TO EACH ENTRY**
+            for c, e in enumerate(row_entries):
+                e.bind("<Return>", make_on_enter(row_obj, c))
+
+            refresh_grid()
+            canvas.update_idletasks()
+            canvas.configure(scrollregion=canvas.bbox("all"))
 
 
+    
             
-
             
             canvas.update_idletasks()
             canvas.configure(scrollregion=canvas.bbox("all"))

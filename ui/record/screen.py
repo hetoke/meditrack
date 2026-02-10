@@ -3,6 +3,7 @@ from tkinter import messagebox
 
 
 from ui.record.controller import RecordController
+from datetime import datetime, date
 
 
 from services.record_service import (
@@ -17,7 +18,7 @@ from services.record_service import (
 from prescription import show_ho_so_detail_window
 from intellisense import AutocompleteEntry
 
-ITEMS_PER_PAGE = 3
+ITEMS_PER_PAGE = 15
 
 
 # -------------------------
@@ -70,7 +71,7 @@ def show_ho_so_window(root, container, show_primary_window, controller=None):
 
     next_btn = tb.Button(
         pagination_frame,
-        text="← Sau",
+        text="→ Sau",
         command=lambda: change_page(
             controller, 1,
             record_frame, page_label,
@@ -119,51 +120,112 @@ def show_ho_so_window(root, container, show_primary_window, controller=None):
 # -------------------------
 # render_record_list (accept show_primary_window)
 # -------------------------
+
+def format_last_modified(dt):
+    if not dt:
+        return "Chưa cập nhật"
+
+    if isinstance(dt, datetime):
+        return f"Cập nhật: {dt.strftime('%d/%m/%Y %H:%M')}"
+
+    if isinstance(dt, date):
+        return f"Cập nhật: {dt.strftime('%d/%m/%Y')}"
+
+    return "Chưa cập nhật"
+
+def stop_event(event):
+    return "break"
+
+def open_detail(event, root, container, record, show_ho_so_window, show_primary_window):
+    show_ho_so_detail_window(
+        root, container, record, show_ho_so_window, show_primary_window
+    )
+
+def bind_card_click(widget, callback, exclude_widget=None):
+    """Recursively bind click event to widget and all its children"""
+    widget.bind("<Button-1>", callback)
+    for child in widget.winfo_children():
+        # Skip the excluded widget and buttons
+        if child is exclude_widget or isinstance(child, tb.Button):
+            continue
+        bind_card_click(child, callback, exclude_widget)
+
 def render_record_list(root, container, page_label, show_primary_window, controller):
     record_list = controller.filtered_records
+    
     for w in container.winfo_children():
         w.destroy()
-
-    start = (controller.current_page- 1) * ITEMS_PER_PAGE
+    
+    start = (controller.current_page - 1) * ITEMS_PER_PAGE
     end = start + ITEMS_PER_PAGE
     page_items = record_list[start:end]
-
+    
     for record in page_items:
-        hoso_id, name, year, address, phone, _ = record
-
-        card = tb.Frame(container, padding=10)
-        card.pack(fill="x", pady=5)
-
-        tb.Label(card, text=f"{name} - {year}", font=("Quicksand", 12, "bold")).pack(anchor="w")
-        tb.Label(card, text=f"{address}").pack(anchor="w")
-        tb.Label(card, text=f"{phone}").pack(anchor="w")
-
-        # Make card clickable
-        card.bind("<Button-1>", lambda e, r=record: show_ho_so_detail_window(
-            root, container, r, show_ho_so_window, show_primary_window
-        ))
-        for child in card.winfo_children():
-            child.bind("<Button-1>", lambda e, r=record: show_ho_so_detail_window(
-                root, container, r, show_ho_so_window, show_primary_window
-            ))
-
-        btn_frame = tb.Frame(card)
-        btn_frame.pack(anchor="e")
-
-        tb.Button(
-            btn_frame, text="✏ Sửa hồ sơ", bootstyle="info-outline",
-            command=lambda rid=hoso_id, r=record: show_edit_ho_so_window(root, container, show_primary_window, controller, rid, r)
-        ).pack(side="left", padx=5)
-
-        tb.Button(
-            btn_frame, text="🗑 Xoá hồ sơ", bootstyle="danger-outline",
-            command=lambda rid=hoso_id: delete_ho_so(root, container, show_primary_window, controller, page_label, rid)
-        ).pack(side="left")
-
+        hoso_id, name, year, address, phone, tiencan, last_modified = record
+        
+        # CARD
+        card = tb.Frame(container, padding=(8, 3))
+        card.pack(fill="x", pady=2)
+        
+        # ROW
+        row = tb.Frame(card)
+        row.pack(fill="x")
+        
+        # LEFT: Name + year
+        left = tb.Frame(row)
+        left.pack(side="left", fill="x", expand=True)
+        tb.Label(
+            left,
+            text=f"{name} ({year})",
+            font=("Quicksand", 12)
+        ).pack(anchor="w")
+        
+        # RIGHT: Buttons
+        btn_frame = tb.Frame(row, width=300, height=28)
+        btn_frame.pack(side="right")
+        btn_frame.pack_propagate(False)
+        
+        btn_inner = tb.Frame(btn_frame)
+        btn_inner.pack(expand=True)
+        
+        edit_btn = tb.Button(
+            btn_inner,
+            text="✏ Sửa hồ sơ",
+            style="CompactInfo.TButton",
+            command=lambda rid=hoso_id, r=record: show_edit_ho_so_window(
+                root, container, show_primary_window, controller, rid, r
+            )
+        )
+        edit_btn.pack(side="left", padx=2)
+        
+        del_btn = tb.Button(
+            btn_inner,
+            text="🗑 Xoá hồ sơ",
+            style="CompactDanger.TButton",
+            command=lambda rid=hoso_id: delete_ho_so(
+                root, container, show_primary_window, controller, page_label, rid
+            )
+        )
+        del_btn.pack(side="left", padx=2)
+        
+        # FAR RIGHT: Last modified
+        right = tb.Frame(row)
+        right.pack(side="right", padx=10)
+        tb.Label(
+            right,
+            text=format_last_modified(last_modified),
+            font=("Quicksand", 10),
+            foreground="#6c757d"
+        ).pack(anchor="e")
+        
+        # BIND CLICK to open detail - exclude btn_frame to preserve button handlers
+        click_handler = lambda e, r=record: open_detail(
+            e, root, container, r, show_ho_so_window, show_primary_window
+        )
+        bind_card_click(card, click_handler, exclude_widget=btn_frame)
+    
     max_page = max(1, (len(record_list) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
-    page_label.config(
-        text=f"Page {controller.current_page} / {max_page}"
-    )
+    page_label.config(text=f"Page {controller.current_page} / {max_page}")
 
 # -------------------------
 # show_edit_ho_so_window (persist edits to DB)
@@ -171,39 +233,32 @@ def render_record_list(root, container, page_label, show_primary_window, control
 def show_edit_ho_so_window(root, container, show_primary_window, controller, hoso_id, record):
     """Edit a HoSo record by HoSoID (persists to DB)."""
     # record may be outdated; we still use it for initial fill
-    _, name, year, address, phone, tiencan = record
-
+    _, name, year, address, phone, tiencan, _ = record
     for w in container.winfo_children():
         w.destroy()
-
     tb.Label(container, text="Sửa hồ sơ", font=("Quicksand", 16, "bold")).pack(pady=10)
-
     # Entries
     tb.Label(container, text="Tên:").pack(anchor="w", padx=10)
     name_entry = tb.Entry(container)
     name_entry.insert(0, name)
     name_entry.pack(fill="x", padx=10, pady=5)
-
     tb.Label(container, text="Năm sinh:").pack(anchor="w", padx=10)
     year_entry = tb.Entry(container)
     year_entry.insert(0, year)
     year_entry.pack(fill="x", padx=10, pady=5)
-
     tb.Label(container, text="Địa chỉ:").pack(anchor="w", padx=10)
     address_entry = tb.Entry(container)
     address_entry.insert(0, address)
     address_entry.pack(fill="x", padx=10, pady=5)
-
     tb.Label(container, text="SĐT:").pack(anchor="w", padx=10)
     phone_entry = tb.Entry(container)
     phone_entry.insert(0, phone)
     phone_entry.pack(fill="x", padx=10, pady=5)
-
     tb.Label(container, text="Tiền căn").pack(anchor="w", padx=10) 
     tiencan_entry = tb.Text(container, width=40, height=5) 
     tiencan_entry.insert("1.0", tiencan)
     tiencan_entry.pack(fill="x", padx=10, pady=5)
-
+    
     def save_changes():
         year_value = year_entry.get().strip()
         if year_value and not year_value.isdigit():
@@ -217,11 +272,11 @@ def show_edit_ho_so_window(root, container, show_primary_window, controller, hos
             phone_entry.get().strip(),
             tiencan_entry.get("1.0", "end").strip()
         )
-
-
         # refresh in-memory list from DB and go back to list view
+        cleared_container = clear_parents(container, stop_at=root, levels=2)
         controller.refresh()
-        show_ho_so_window(root, container, show_primary_window, controller)
+        show_ho_so_window(root, cleared_container, show_primary_window, controller)
+    
 
     tb.Button(container, text="💾 Lưu", bootstyle="success-outline", command=save_changes).pack(pady=10)
     tb.Button(container, text="↩ Quay lại", bootstyle="secondary-outline",
@@ -234,10 +289,18 @@ def show_edit_ho_so_window(root, container, show_primary_window, controller, hos
 def delete_ho_so(root, container, show_primary_window, controller, page_label, hoso_id):
     if not messagebox.askyesno("Xác nhận", "Bạn có chắc chắn muốn xoá hồ sơ này?"):
         return
+    
     delete_record(hoso_id)
-
-    # refresh records from DB and re-render list
+    
+    # Refresh records from DB
     controller.refresh()
+    
+    # Adjust page if we deleted the last item on the current page
+    max_page = max(1, (len(controller.filtered_records) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
+    if controller.current_page > max_page:
+        controller.current_page = max_page
+    
+    # Just call show_ho_so_window - it will handle the clearing
     show_ho_so_window(root, container, show_primary_window, controller)
 
 # -------------------------

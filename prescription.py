@@ -29,7 +29,7 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
     container = clear_parents(container, stop_at=root, levels=2)
 
     # record is (HoSoID, Ten, NamSinh, DiaChi, DienThoai, TienCan)
-    hoso_id, name, year, address, phone, tiencan = record
+    hoso_id, name, year, address, phone, tiencan, _ = record
 
     # --- Sidebar ---
     sidebar = tb.Frame(container, padding=20)
@@ -111,19 +111,19 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
         return f
 
     def apply_table_zoom(prescription):
-        zoom = prescription.get("zoom", 1.0)
+        zoom = prescription.zoom  # Access attribute directly
         size = max(8, min(24, int(round(base_font_size * zoom))))
         pad = max(0, int(round(base_pad * zoom)))
         ipad = max(0, int(round(2 * zoom)))
         row_height = max(10, int(round(base_row * zoom)))
-        grid = prescription.get("grid_frame")
+        grid = prescription.grid_frame
         if not grid:
             return
-        row_count = prescription.get("row_count", 0)
+        row_count = prescription.row_count
         if row_count:
             for r in range(row_count):
                 grid.grid_rowconfigure(r, minsize=row_height)
-        col_widths = prescription.get("col_widths", [])
+        col_widths = prescription.col_widths
         width_scale = zoom * 0.75 if zoom < 1.0 else zoom
         for w in grid.winfo_children():
             try:
@@ -146,9 +146,9 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
         if not prescriptions:
             return
         p = prescriptions[current_index["value"]]
-        new_zoom = p.get("zoom", 1.0) + delta
+        new_zoom = p.zoom + delta  # Access attribute directly
         new_zoom = max(zoom_min, min(zoom_max, new_zoom))
-        p["zoom"] = new_zoom
+        p.zoom = new_zoom  # Set attribute directly
         apply_table_zoom(p)
 
     zoom_row = tb.Frame(sidebar_actions)
@@ -323,9 +323,11 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
 
     # --- Back button ---
     def confirm_back():
-        if any(p.dirty for p in prescriptions):
-            if not messagebox.askyesno("Chưa lưu", "Bạn có thay đổi chưa lưu. Quay lại mà không lưu?"):
-                return
+        if prescriptions:
+            current_prescription = prescriptions[current_index["value"]]
+            if current_prescription.dirty:
+                if not messagebox.askyesno("Chưa lưu", "Đơn thuốc hiện tại có thay đổi chưa lưu. Quay lại mà không lưu?"):
+                    return
         show_ho_so_window(root, container, show_primary_window)
 
     tb.Button(
