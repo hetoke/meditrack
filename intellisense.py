@@ -11,20 +11,27 @@ class AutocompleteEntry(tk.Entry):
         self.listbox_visible = False
         
         # Bind events
-        self.bind("<FocusOut>", self._on_focus_out)
+        # self.bind("<FocusOut>", self._on_focus_out)
         self.bind("<Escape>", lambda e: self.destroy_listbox())
         self.winfo_toplevel().bind("<Button-1>", self._click_outside, add="+")
         self.bind("<Down>", self.move_down)
-        self.bind("<Destroy>", lambda e: self.destroy_listbox())
+        self.bind("<Destroy>", self._cleanup)
+
+    def _cleanup(self, event=None):
+        self.destroy_listbox()
+        try:
+            self.winfo_toplevel().unbind("<Button-1>")
+        except Exception:
+            pass
         
-    def _on_focus_out(self, event):
-        # Delay destruction to allow selection to complete
-        self.after(100, self._delayed_destroy)
+    # def _on_focus_out(self, event):
+    #     # Delay destruction to allow selection to complete
+    #     self.after(100, self._delayed_destroy)
         
-    def _delayed_destroy(self):
-        # Only destroy if entry still doesn't have focus
-        if self.focus_get() != self:
-            self.destroy_listbox()
+    # def _delayed_destroy(self):
+    #     # Only destroy if entry still doesn't have focus
+    #     if self.focus_get() != self:
+    #         self.destroy_listbox()
     
     def _click_outside(self, event):
         if self.listbox and event.widget not in (self, self.listbox):
@@ -46,6 +53,9 @@ class AutocompleteEntry(tk.Entry):
             suggestions = self.fetch_suggestions(value)
         except Exception:
             suggestions = []
+
+        if not suggestions:
+            return
         
         matches = [s for s in suggestions if s.lower().startswith(value.lower())]
         if not matches:

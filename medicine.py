@@ -16,6 +16,8 @@ def fetch_medicines():
     session = get_session()
     medicines = session.query(Thuoc).all()
     session.close()
+
+
     return [(t.Ten, float(t.Gia)) for t in medicines]
 
 
@@ -101,9 +103,9 @@ def show_thuoc_window(root, page_container, show_primary_window):
         current_page["value"] = 1
         render_medicine_list(root, medicine_frame, page_label, show_primary_window, medicine_list=filtered_medicines["data"])
 
-    search_entry.bind("<KeyRelease>", on_search_change)
+    search_entry.var.trace_add("write", lambda *args: on_search_change())
     search_entry.bind("<<AutocompleteSelected>>", lambda e: on_search_change())
-    search_entry.bind("<Return>", lambda e: on_search_change(), add="+")
+
 
     tb.Button(
         search_frame, text="+ Thêm thuốc", bootstyle="success",

@@ -15,6 +15,10 @@ class PrescriptionTable:
         self.dirty = False
         self.zoom = 1.0
 
+        self._resize_col = None
+        self._resize_start_x = 0
+        self._resize_start_width = 0
+
         self.grid_frame = None
         self.row_count = 0
         self.col_widths = [22, 6, 6, 6, 6, 6, 6, 6]

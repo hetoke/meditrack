@@ -25,10 +25,13 @@ ITEMS_PER_PAGE = 15
 # show_ho_so_window (small fixes)
 # -------------------------
 def show_ho_so_window(root, container, show_primary_window, controller=None):
+    for w in container.winfo_children():
+        w.destroy()
+
     if controller is None:
         controller = RecordController()
         controller.refresh()
-    container = clear_parents(container, stop_at=root, levels=2)
+    
 
     tb.Label(container, text="Hồ sơ bệnh nhân", font=("Quicksand", 16, "bold")).pack(pady=10)
 
@@ -193,7 +196,7 @@ def render_record_list(root, container, page_label, show_primary_window, control
             text="✏ Sửa hồ sơ",
             style="CompactInfo.TButton",
             command=lambda rid=hoso_id, r=record: show_edit_ho_so_window(
-                root, container, show_primary_window, controller, rid, r
+                root, container.master, show_primary_window, controller, rid, r
             )
         )
         edit_btn.pack(side="left", padx=2)
@@ -203,7 +206,7 @@ def render_record_list(root, container, page_label, show_primary_window, control
             text="🗑 Xoá hồ sơ",
             style="CompactDanger.TButton",
             command=lambda rid=hoso_id: delete_ho_so(
-                root, container, show_primary_window, controller, page_label, rid
+                root, container.master, show_primary_window, controller, page_label, rid
             )
         )
         del_btn.pack(side="left", padx=2)
@@ -273,9 +276,9 @@ def show_edit_ho_so_window(root, container, show_primary_window, controller, hos
             tiencan_entry.get("1.0", "end").strip()
         )
         # refresh in-memory list from DB and go back to list view
-        cleared_container = clear_parents(container, stop_at=root, levels=2)
+        
         controller.refresh()
-        show_ho_so_window(root, cleared_container, show_primary_window, controller)
+        show_ho_so_window(root, container, show_primary_window, controller)
     
 
     tb.Button(container, text="💾 Lưu", bootstyle="success-outline", command=save_changes).pack(pady=10)
@@ -380,12 +383,3 @@ def change_page(controller, direction, container, page_label, root, show_primary
     render_record_list(root, container, page_label, show_primary_window, controller)
 
 
-def clear_parents(widget, stop_at=None, levels=2):
-    parent = widget
-    for _ in range(levels - 1):
-        if parent.master == stop_at or parent.master is None:
-            break
-        parent = parent.master
-    for w in parent.winfo_children():
-        w.destroy()
-    return parent
