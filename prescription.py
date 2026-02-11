@@ -196,6 +196,26 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
         if current_index["value"] > 0:
             show_prescription(current_index["value"] - 1)
 
+    def collect_prescription_rows(entries):
+        rows = []
+
+        for row in entries:
+            # row is a dict with key "entries"
+            cells = row["entries"]
+
+            values = []
+            for e in cells:
+                if hasattr(e, "get"):
+                    values.append(e.get().strip())
+                else:
+                    values.append(str(e).strip())
+
+            #print(values)
+            if any(values):
+                rows.append(values)
+
+        return rows
+
     def add_prescription():
         t = PrescriptionTable(content)
         prescriptions.append(t)
@@ -206,9 +226,10 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
             return
 
         src = prescriptions[current_index["value"]]
+        rows = collect_prescription_rows(src.entries)
 
         chandoan = src.chandoan_text.get("1.0", "end").strip()
-        rows = [[e.get() for e in row] for row in src.entries]
+        rows = [[e for e in row] for row in rows]
 
         t = PrescriptionTable(
             content,
@@ -240,25 +261,7 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
             prescriptions.append(new_t)
             show_prescription(0)
 
-    def collect_prescription_rows(entries):
-        rows = []
-
-        for row in entries:
-            # row is a dict with key "entries"
-            cells = row["entries"]
-
-            values = []
-            for e in cells:
-                if hasattr(e, "get"):
-                    values.append(e.get().strip())
-                else:
-                    values.append(str(e).strip())
-
-            #print(values)
-            if any(values):
-                rows.append(values)
-
-        return rows
+    
 
     def save_current_prescription():
         if not prescriptions:
