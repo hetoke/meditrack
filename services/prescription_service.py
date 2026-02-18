@@ -100,9 +100,9 @@ def save_prescription(
         if donthuoc_obj is None:
             donthuoc_obj = DonThuoc(
                 HoSoID=hoso_id,
-                NgayLap=datetime.now(),
             )
 
+        donthuoc_obj.NgayLap = datetime.now()
         donthuoc_obj.MoTa = chandoan_text
         donthuoc_obj = session.merge(donthuoc_obj)
         session.commit()
