@@ -42,7 +42,7 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
 
     sidebar_total_label = tb.Label(
         sidebar,
-        text=f"Tổng tiền: {format_currency(0)}",
+        text=f"T: {format_currency(0)}",
         anchor="w",
         justify="left",
         font=("Quicksand", 14, "bold"),

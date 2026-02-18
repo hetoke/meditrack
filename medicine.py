@@ -14,7 +14,7 @@ from intellisense import AutocompleteEntry
 # -------------------------
 def fetch_medicines():
     session = get_session()
-    medicines = session.query(Thuoc).all()
+    medicines = session.query(Thuoc).order_by(Thuoc.Ten).all()
     session.close()
 
 
