@@ -293,7 +293,7 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
             )
 
         sidebar_total_label.config(
-            text=f"Tổng tiền: {format_currency(total_cost)}"
+            text=f"T: {format_currency(total_cost)}"
         )
 
         messagebox.showinfo("Thông báo", "Đã lưu đơn thuốc thành công!")
