@@ -7,8 +7,6 @@ from datetime import datetime, date
 
 
 from services.record_service import (
-    parse_search_query,
-    name_matches,
     fetch_patient_suggestions,
     create_record,
     update_record,
@@ -28,9 +26,10 @@ def show_ho_so_window(root, container, show_primary_window, controller=None):
     for w in container.winfo_children():
         w.destroy()
 
+    current_search_query = {"value": None}
     if controller is None:
         controller = RecordController()
-        controller.refresh()
+
     
 
     tb.Label(container, text="Hồ sơ bệnh nhân", font=("Quicksand", 16, "bold")).pack(pady=10)
@@ -64,7 +63,8 @@ def show_ho_so_window(root, container, show_primary_window, controller=None):
         command=lambda: change_page(
             controller, -1,
             record_frame, page_label,
-            root, show_primary_window
+            root, show_primary_window,
+            current_search_query["value"]
         )
     )
     prev_btn.pack(side="left", padx=10)
@@ -78,7 +78,8 @@ def show_ho_so_window(root, container, show_primary_window, controller=None):
         command=lambda: change_page(
             controller, 1,
             record_frame, page_label,
-            root, show_primary_window
+            root, show_primary_window,
+            current_search_query["value"]
         )
     )
     next_btn.pack(side="left", padx=10)
@@ -88,24 +89,16 @@ def show_ho_so_window(root, container, show_primary_window, controller=None):
     
 
     def on_search_change(*args):
-        query = search_entry.get().strip()
-        if query:
-            name_query, year_query = parse_search_query(query)
-            controller.filtered_records = [
-                r for r in controller.records
-                if (year_query is None or (r[2] is not None and int(r[2]) == year_query))
-                and name_matches(r[1], name_query)
-            ]
-        else:
-            controller.filtered_records = controller.records.copy()
-
         controller.current_page = 1
+        current_search_query["value"] = search_entry.get().strip()
+
         render_record_list(
             root,
             record_frame,
             page_label,
             show_primary_window,
-            controller
+            controller,
+            current_search_query["value"]
         )
     search_entry.var.trace_add("write", on_search_change)
 
@@ -153,81 +146,81 @@ def bind_card_click(widget, callback, exclude_widget=None):
             continue
         bind_card_click(child, callback, exclude_widget)
 
-def render_record_list(root, container, page_label, show_primary_window, controller):
-    record_list = controller.filtered_records
+def render_record_list(root, container, page_label, show_primary_window, controller, search_query=None):
     
+    record_list = controller.get_page(
+        controller.current_page,
+        ITEMS_PER_PAGE,
+        search_query
+    )
+
     for w in container.winfo_children():
         w.destroy()
-    
-    start = (controller.current_page - 1) * ITEMS_PER_PAGE
-    end = start + ITEMS_PER_PAGE
-    page_items = record_list[start:end]
-    
-    for record in page_items:
+
+    for record in record_list:
         hoso_id, name, year, address, phone, tiencan, last_modified = record
-        
-        # CARD
+
         card = tb.Frame(container, padding=(8, 3))
         card.pack(fill="x", pady=2)
-        
-        # ROW
+
         row = tb.Frame(card)
         row.pack(fill="x")
-        
-        # LEFT: Name + year
+
         left = tb.Frame(row)
         left.pack(side="left", fill="x", expand=True)
+
         tb.Label(
             left,
             text=f"{name} ({year})",
             font=("Quicksand", 12)
         ).pack(anchor="w")
-        
-        # RIGHT: Buttons
+
         btn_frame = tb.Frame(row, width=300, height=28)
         btn_frame.pack(side="right")
         btn_frame.pack_propagate(False)
-        
+
         btn_inner = tb.Frame(btn_frame)
         btn_inner.pack(expand=True)
-        
-        edit_btn = tb.Button(
+
+        tb.Button(
             btn_inner,
             text="✏ Sửa hồ sơ",
             style="CompactInfo.TButton",
             command=lambda rid=hoso_id, r=record: show_edit_ho_so_window(
                 root, container.master, show_primary_window, controller, rid, r
             )
-        )
-        edit_btn.pack(side="left", padx=2)
-        
-        del_btn = tb.Button(
+        ).pack(side="left", padx=2)
+
+        tb.Button(
             btn_inner,
             text="🗑 Xoá hồ sơ",
             style="CompactDanger.TButton",
             command=lambda rid=hoso_id: delete_ho_so(
-                root, container.master, show_primary_window, controller, page_label, rid
+                root, container, show_primary_window,
+                controller, page_label, rid, search_query
             )
-        )
-        del_btn.pack(side="left", padx=2)
-        
-        # FAR RIGHT: Last modified
+        ).pack(side="left", padx=2)
+
         right = tb.Frame(row)
         right.pack(side="right", padx=10)
+
         tb.Label(
             right,
             text=format_last_modified(last_modified),
             font=("Quicksand", 10),
             foreground="#6c757d"
         ).pack(anchor="e")
-        
-        # BIND CLICK to open detail - exclude btn_frame to preserve button handlers
+
         click_handler = lambda e, r=record: open_detail(
             e, root, container, r, show_ho_so_window, show_primary_window
         )
         bind_card_click(card, click_handler, exclude_widget=btn_frame)
-    
-    max_page = max(1, (len(record_list) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
+
+    max_page = max(
+        1,
+        (controller.total_records + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
+    )
+
     page_label.config(text=f"Page {controller.current_page} / {max_page}")
 
 # -------------------------
@@ -275,9 +268,7 @@ def show_edit_ho_so_window(root, container, show_primary_window, controller, hos
             phone_entry.get().strip(),
             tiencan_entry.get("1.0", "end").strip()
         )
-        # refresh in-memory list from DB and go back to list view
-        
-        controller.refresh()
+
         show_ho_so_window(root, container, show_primary_window, controller)
     
 
@@ -289,22 +280,32 @@ def show_edit_ho_so_window(root, container, show_primary_window, controller, hos
 # -------------------------
 # delete_ho_so (persist delete to DB)
 # -------------------------
-def delete_ho_so(root, container, show_primary_window, controller, page_label, hoso_id):
+def delete_ho_so(root, container, show_primary_window,
+                 controller, page_label, hoso_id, search_query=None):
+
     if not messagebox.askyesno("Xác nhận", "Bạn có chắc chắn muốn xoá hồ sơ này?"):
         return
-    
+
     delete_record(hoso_id)
-    
-    # Refresh records from DB
-    controller.refresh()
-    
-    # Adjust page if we deleted the last item on the current page
-    max_page = max(1, (len(controller.filtered_records) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
+
+    max_page = max(
+        1,
+        (controller.total_records - 1 + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
+    )
+
     if controller.current_page > max_page:
         controller.current_page = max_page
-    
-    # Just call show_ho_so_window - it will handle the clearing
-    show_ho_so_window(root, container, show_primary_window, controller)
+
+    render_record_list(
+        root,
+        container,
+        page_label,
+        show_primary_window,
+        controller,
+        search_query
+    )
+
+
 
 # -------------------------
 # show_add_ho_so_window (refresh records after commit)
@@ -357,9 +358,6 @@ def show_add_ho_so_window(root, page_container, controller, show_primary_window)
 
         if name:
             create_record(name, year, address, phone, tiencan)
-
-            # refresh in-memory list and go back to list view
-            controller.refresh()
             show_ho_so_window(root, page_container, show_primary_window)
 
     tb.Button(form, text="Thêm hồ sơ", bootstyle="success", command=add_ho_so).pack(pady=10)
@@ -371,15 +369,24 @@ def show_add_ho_so_window(root, page_container, controller, show_primary_window)
 
 
 
-def change_page(controller, direction, container, page_label, root, show_primary_window):
+def change_page(controller, direction, container, page_label, root, show_primary_window, search_query=None):
     max_page = max(
         1,
-        (len(controller.filtered_records) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
+        (controller.total_records + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
     )
+
     controller.current_page = max(
         1,
         min(max_page, controller.current_page + direction)
     )
-    render_record_list(root, container, page_label, show_primary_window, controller)
+
+    render_record_list(
+        root,
+        container,
+        page_label,
+        show_primary_window,
+        controller,
+        search_query
+    )
 
 

@@ -11,69 +11,43 @@ from db.session import get_session
 # -------------------------
 # Fetch
 # -------------------------
-def fetch_records():
+
+def fetch_records_page(page, page_size, search_query=None):
     session = get_session()
 
-    # 1️⃣ Subquery: latest NgayLap per HoSo
-    latest_donthuoc = (
-        session.query(
-            DonThuoc.HoSoID.label("hoso_id"),
-            func.max(DonThuoc.NgayLap).label("latest_ngaylap"),
-        )
-        .group_by(DonThuoc.HoSoID)
-        .subquery()
-    )
+    try:
+        query = session.query(HoSo)
 
-    # 2️⃣ Main query: LEFT JOIN subquery
-    rows = (
-        session.query(
-            HoSo.HoSoID,
-            HoSo.Ten,
-            HoSo.NamSinh,
-            HoSo.DiaChi,
-            HoSo.DienThoai,
-            HoSo.TienCan,
-            func.coalesce(
-                latest_donthuoc.c.latest_ngaylap,
-                HoSo.NgayMoHoSo
-            ).label("last_modified"),
-        )
-        .outerjoin(
-            latest_donthuoc,
-            latest_donthuoc.c.hoso_id == HoSo.HoSoID
-        )
-        .order_by(
-            func.coalesce(
-                latest_donthuoc.c.latest_ngaylap,
-                HoSo.NgayMoHoSo
-            ).desc()
-        )
-        .all()
-    )
+        if search_query:
+            query = query.filter(HoSo.Ten.ilike(f"%{search_query}%"))
 
-    session.close()
+        total = query.count()
 
-    return [
-        (
-            int(hoso_id),
-            ten,
-            int(namsinh) if namsinh is not None else None,
-            diachi,
-            dienthoai,
-            tiencan,
-            last_modified,
+        rows = (
+            query
+            .order_by(HoSo.HoSoID.desc())
+            .limit(page_size)
+            .offset((page - 1) * page_size)
+            .all()
         )
-        for (
-            hoso_id,
-            ten,
-            namsinh,
-            diachi,
-            dienthoai,
-            tiencan,
-            last_modified,
-        ) in rows
-    ]
 
+        result = [
+            (
+                r.HoSoID,
+                r.Ten,
+                r.NamSinh,
+                r.DiaChi,
+                r.DienThoai,
+                r.TienCan,
+                r.NgayMoHoSo
+            )
+            for r in rows
+        ]
+
+        return result, total
+
+    finally:
+        session.close()
 
 # -------------------------
 # Create
