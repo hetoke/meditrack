@@ -316,12 +316,6 @@ class PrescriptionTable:
         else:
             add_row()
 
-        tb.Button(
-            self.frame,
-            text="Thêm dòng",
-            bootstyle="success",
-            command=lambda: add_row(),
-        ).pack(anchor="e", pady=5)
 
     # -------------------------------------------------
     # Internal
