@@ -46,6 +46,38 @@ def calculate_total_from_donthuoc(donthuoc_obj):
         total += dose * price
     return total
 
+
+def fetch_prescription_summaries_by_hoso(hoso_id):
+    session = get_session()
+    try:
+        return (
+            session.query(
+                DonThuoc.DonThuocID,
+                DonThuoc.NgayLap
+            )
+            .filter(DonThuoc.HoSoID == hoso_id)
+            .order_by(DonThuoc.NgayLap)
+            .all()
+        )
+    finally:
+            session.close()
+
+
+def fetch_prescription_detail_by_id(prescription_id):
+    session = get_session()
+    try:
+        return (
+            session.query(DonThuoc)
+            .options(
+                joinedload(DonThuoc.chidinh_list)
+                .joinedload(ChiDinh.thuoc)
+            )
+            .filter(DonThuoc.DonThuocID == prescription_id)
+            .first()
+        )
+    finally:
+        session.close()
+
 def fetch_prescriptions_by_hoso(hoso_id):
     session = get_session()
     try:

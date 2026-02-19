@@ -39,4 +39,4 @@ Beta v1.33
 Delete buttons: Zoom In, Zoom Out, Add row [resolved]
 Bold text for prescription dose number [resolved]
 Medicine view at least 8 medicine per screen [resolved]
-
+Vietnamese colation on medicine names [resolved]

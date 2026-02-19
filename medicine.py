@@ -9,7 +9,6 @@ from intellisense import AutocompleteEntry
 
 
 
-
 # -------------------------
 # Helpers
 # -------------------------

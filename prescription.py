@@ -10,7 +10,8 @@ from services.prescription_service import (
     format_currency,
     format_ngaylap,
     calculate_total_from_donthuoc,
-    fetch_prescriptions_by_hoso,
+    fetch_prescription_summaries_by_hoso,
+    fetch_prescription_detail_by_id,
     save_prescription,
     delete_prescription_by_id,
     fetch_thuoc_suggestions
@@ -68,9 +69,10 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
     tiencan_text.config(state="disabled")
 
     # ============= PRESCRIPTIONS =============
-    prescriptions = []
     current_index = {"value": 0}
-    donthuoc_list = fetch_prescriptions_by_hoso(hoso_id)
+    summary_rows = fetch_prescription_summaries_by_hoso(hoso_id)
+    prescription_ids = [row.DonThuocID for row in summary_rows]
+    prescriptions = [None] * len(prescription_ids)
 
     # --- Navigation in sidebar ---
     sidebar_nav = tb.Frame(sidebar)
@@ -118,13 +120,21 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
 
     # --- Navigation / CRUD functions ---
     def show_prescription(index):
+        # Hide existing tables
         for t in prescriptions:
-            t.pack_forget()
+            if t:
+                t.pack_forget()
+
+        # Lazy build if not created yet
+        if prescriptions[index] is None:
+            prescription_id = prescription_ids[index]
+            don = fetch_prescription_detail_by_id(prescription_id)
+            prescriptions[index] = PrescriptionTable(content, don)
 
         t = prescriptions[index]
         t.pack(fill="both", expand=True)
-        current_index["value"] = index
 
+        current_index["value"] = index
         nav_label.config(text=f"Đơn {index+1}/{len(prescriptions)}")
 
         if t.donthuoc and t.donthuoc.NgayLap:
@@ -252,12 +262,10 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
 
         messagebox.showinfo("Thông báo", "Đã lưu đơn thuốc thành công!")
 
-    # --- Build prescriptions from DB ---
-    for don in donthuoc_list:
-        prescriptions.append(PrescriptionTable(content, don))
-
-    if not prescriptions:
-        prescriptions.append(PrescriptionTable(content))
+    if not prescription_ids:
+        prescriptions = [PrescriptionTable(content)]
+    else:
+        prescriptions = [None] * len(prescription_ids)
 
     show_prescription(len(prescriptions) - 1)
 
