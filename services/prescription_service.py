@@ -118,48 +118,65 @@ def normalize_cells(row):
     # already list of strings
     return [str(v).strip() for v in row]
 
+
 def save_prescription(
     hoso_id,
     donthuoc_obj,
     chandoan_text,
     entry_rows,
 ):
-    """
-    entry_rows: list[list[tk.Entry]]  (UI owns widgets, service reads values)
-    """
     session = get_session()
     try:
+        # 1️⃣ Create or merge DonThuoc
         if donthuoc_obj is None:
-            donthuoc_obj = DonThuoc(
-                HoSoID=hoso_id,
-            )
+            donthuoc_obj = DonThuoc(HoSoID=hoso_id)
 
         donthuoc_obj.NgayLap = datetime.now()
         donthuoc_obj.MoTa = chandoan_text
+
         donthuoc_obj = session.merge(donthuoc_obj)
-        session.commit()
+        session.flush()  # ensure DonThuocID exists (no commit yet)
 
-        # clear old ChiDinh
-        for chi in list(donthuoc_obj.chidinh_list):
-            session.delete(chi)
-        session.commit()
+        # 2️⃣ Delete old ChiDinh (bulk delete, cleaner)
+        session.query(ChiDinh)\
+            .filter(ChiDinh.DonThuocID == donthuoc_obj.DonThuocID)\
+            .delete()
 
-        total_cost = 0.0
+        # 3️⃣ Collect valid rows + medicine names
+        valid_rows = []
+        medicine_names = []
 
         for row in entry_rows:
             values = normalize_cells(row)
-
             if not any(values):
                 continue
 
             name = values[0]
-            thuoc_obj = session.query(Thuoc).filter(Thuoc.Ten == name).first()
+            valid_rows.append(values)
+            medicine_names.append(name)
+
+        # 4️⃣ Bulk load all medicines at once (fix N+1)
+        thuoc_list = (
+            session.query(Thuoc)
+            .filter(Thuoc.Ten.in_(medicine_names))
+            .all()
+        )
+
+        thuoc_map = {t.Ten: t for t in thuoc_list}
+
+        total_cost = 0.0
+
+        # 5️⃣ Create ChiDinh rows
+        for values in valid_rows:
+            name = values[0]
+            thuoc_obj = thuoc_map.get(name)
+
             if not thuoc_obj:
                 raise ValueError(f"Thuốc '{name}' không tồn tại")
 
             price = float(thuoc_obj.Gia or 0)
-
             doses = [safe_float(v) for v in values[1:8]]
+
             total_cost += sum(doses) * price
 
             chi = ChiDinh(
@@ -173,22 +190,27 @@ def save_prescription(
                 ChieuSauAn=doses[5],
                 Toi=doses[6],
             )
+
             session.add(chi)
 
+        # 6️⃣ Update total and commit once
         donthuoc_obj.TienToa = total_cost
         session.commit()
 
+        # 7️⃣ Reload with relationships for UI
         donthuoc_obj = session.get(
             DonThuoc,
             donthuoc_obj.DonThuocID,
-            options=[selectinload(DonThuoc.chidinh_list).selectinload(ChiDinh.thuoc)],
+            options=[
+                selectinload(DonThuoc.chidinh_list)
+                .selectinload(ChiDinh.thuoc)
+            ],
         )
 
         return donthuoc_obj, total_cost
 
     finally:
         session.close()
-
 def fetch_thuoc_suggestions(prefix: str):
     if not prefix:
         return []
