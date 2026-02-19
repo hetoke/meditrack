@@ -23,8 +23,13 @@ class PrescriptionTable:
         self.row_count = 0
         self.col_widths = [22, 6, 6, 6, 6, 6, 6, 6]
 
+        default_font = tkfont.nametofont("TkDefaultFont")
+        self.bold_font = default_font.copy()
+        self.bold_font.configure(weight="bold")
+
         self._build_chandoan(seed_chandoan)
         self._build_table(seed_rows)
+        
 
     # -------------------------------------------------
     # Public helpers (for screen.py compatibility)
@@ -174,7 +179,11 @@ class PrescriptionTable:
                         width=self.col_widths[c],
                     )
                 else:
-                    e = tk.Entry(self.grid_frame, width=self.col_widths[c])
+                    e = tk.Entry(
+                        self.grid_frame,
+                        width=self.col_widths[c],
+                        font=self.bold_font
+                    )
 
                 if c < len(values):
                     e.insert(0, values[c])
