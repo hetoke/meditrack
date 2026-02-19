@@ -29,4 +29,12 @@ Allow swapping prescription rows up or down option [resolved]
 Allow Enter key to go the next box in prescription table (double Enter on medicine name field) [resolved]
 Check dirty exit on only current prescription [resolved]
 
+Beta v1.32
+Change label Tong tien into T
+Sort medicine name as alphabetical order
+Save prescription will update the updated timestamp every time
 
+Beta v1.33
+Delete buttons: Zoom In, Zoom Out, Add row
+Bold text for prescription dose number
+Medicine view at least 8 medicine per screen

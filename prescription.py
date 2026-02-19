@@ -110,52 +110,6 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
             font_cache[size] = f
         return f
 
-    def apply_table_zoom(prescription):
-        zoom = prescription.zoom  # Access attribute directly
-        size = max(8, min(24, int(round(base_font_size * zoom))))
-        pad = max(0, int(round(base_pad * zoom)))
-        ipad = max(0, int(round(2 * zoom)))
-        row_height = max(10, int(round(base_row * zoom)))
-        grid = prescription.grid_frame
-        if not grid:
-            return
-        row_count = prescription.row_count
-        if row_count:
-            for r in range(row_count):
-                grid.grid_rowconfigure(r, minsize=row_height)
-        col_widths = prescription.col_widths
-        width_scale = zoom * 0.75 if zoom < 1.0 else zoom
-        for w in grid.winfo_children():
-            try:
-                w.configure(font=build_font(size))
-            except Exception:
-                pass
-            try:
-                info = w.grid_info()
-                col = int(info.get("column", 0))
-                if col_widths:
-                    if col < len(col_widths):
-                        w.configure(width=max(5, int(round(col_widths[col] * width_scale))))
-                    else:
-                        w.configure(width=max(3, int(round(6 * zoom))))
-                w.grid_configure(padx=pad, pady=pad, ipady=ipad)
-            except Exception:
-                pass
-
-    def zoom_table(delta):
-        if not prescriptions:
-            return
-        p = prescriptions[current_index["value"]]
-        new_zoom = p.zoom + delta  # Access attribute directly
-        new_zoom = max(zoom_min, min(zoom_max, new_zoom))
-        p.zoom = new_zoom  # Set attribute directly
-        apply_table_zoom(p)
-
-    zoom_row = tb.Frame(sidebar_actions)
-    zoom_row.pack(fill="x", pady=2)
-    tb.Button(zoom_row, text="Thu nhỏ", command=lambda: zoom_table(-zoom_step)).pack(side="left", expand=True, fill="x", padx=(0, 2))
-    tb.Button(zoom_row, text="Phóng to", command=lambda: zoom_table(zoom_step)).pack(side="left", expand=True, fill="x", padx=(2, 0))
-
     
 
     
@@ -182,7 +136,7 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
 
         total_value = calculate_total_from_donthuoc(t.donthuoc)
         sidebar_total_label.config(
-            text=f"Tổng tiền: {format_currency(total_value)}"
+            text=f"T: {format_currency(total_value)}"
         )
 
         prev_btn.config(state=("disabled" if index == 0 else "normal"))
