@@ -30,11 +30,12 @@ Allow Enter key to go the next box in prescription table (double Enter on medici
 Check dirty exit on only current prescription [resolved]
 
 Beta v1.32
-Change label Tong tien into T
-Sort medicine name as alphabetical order
-Save prescription will update the updated timestamp every time
+Change label Tong tien into T [resolved]
+Sort medicine name as alphabetical order [resolved]
+Save prescription will update the updated timestamp every time [resolved]
+
 
 Beta v1.33
-Delete buttons: Zoom In, Zoom Out, Add row
-Bold text for prescription dose number
+Delete buttons: Zoom In, Zoom Out, Add row [resolved]
+Bold text for prescription dose number [resolved]
 Medicine view at least 8 medicine per screen

@@ -22,7 +22,7 @@ def fetch_medicines():
 
 
 medicines = fetch_medicines()
-ITEMS_PER_PAGE = 4
+ITEMS_PER_PAGE = 8
 current_page = {"value": 1}
 
 
@@ -40,26 +40,46 @@ def render_medicine_list(root, page_container, page_label, show_primary_window, 
     end = start + ITEMS_PER_PAGE
     page_items = medicine_list[start:end]
 
+
     for name, price in page_items:
         card = tb.Frame(page_container, padding=10)
         card.pack(fill="x", pady=5)
 
-        tb.Label(card, text=f"💊 {name}", font=("Quicksand", 12, "bold")).pack(anchor="w")
-        tb.Label(card, text=f"{price}đ").pack(anchor="w")
+        # Left container (name + price inline)
+        left_frame = tb.Frame(card)
+        left_frame.pack(side="left", fill="x", expand=True)
 
+        tb.Label(
+            left_frame,
+            text=f"💊 {name}",
+            font=("Quicksand", 12, "bold")
+        ).pack(side="left")
+
+        tb.Label(
+            left_frame,
+            text=f"   {price}đ"
+        ).pack(side="left")
+
+        # Right container (buttons)
         btn_frame = tb.Frame(card)
-        btn_frame.pack(anchor="e")
+        btn_frame.pack(side="right")
 
         tb.Button(
-            btn_frame, text="✏ Sửa", bootstyle="info-outline",
-            command=lambda n=name, p=price: show_edit_thuoc_window(root, page_container, show_primary_window, n, p)
+            btn_frame,
+            text="✏ Sửa",
+            bootstyle="info-outline",
+            command=lambda n=name, p=price:
+                show_edit_thuoc_window(root, page_container, show_primary_window, n, p)
         ).pack(side="left", padx=5)
 
         tb.Button(
-            btn_frame, text="🗑 Xoá", bootstyle="danger-outline",
-            command=lambda n=name: delete_medicine(root, page_container, show_primary_window, page_label, n)
+            btn_frame,
+            text="🗑 Xoá",
+            bootstyle="danger-outline",
+            command=lambda n=name:
+                delete_medicine(root, page_container, show_primary_window, page_label, n)
         ).pack(side="left")
-
+    
     max_page = max(1, (len(medicine_list) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
     page_label.config(text=f"Page {current_page['value']} / {max_page}")
 
