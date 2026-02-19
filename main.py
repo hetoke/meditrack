@@ -7,7 +7,6 @@ from ui.record.screen import show_ho_so_window
 import traceback
 import sys
 
-
 def show_primary_window(root, container):
     """Render the home screen."""
     for w in container.winfo_children():
@@ -50,6 +49,7 @@ def main():
     font_path = os.path.abspath("./Quicksand-Regular.ttf")
     if os.name == "nt":  # Windows only
         windll.gdi32.AddFontResourceW(font_path)
+
 
     # Apply globally (if font is found)
     for f in ["TkDefaultFont", "TkTextFont", "TkHeadingFont"]:

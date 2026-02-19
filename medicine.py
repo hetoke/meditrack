@@ -1,5 +1,6 @@
 import ttkbootstrap as tb
 import tkinter as tk
+import unicodedata
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from db.models import Thuoc  
@@ -12,14 +13,52 @@ from intellisense import AutocompleteEntry
 # -------------------------
 # Helpers
 # -------------------------
+
+
+
+VI_BASE_ORDER = {
+    "ă": "a1",
+    "â": "a2",
+    "đ": "dz",   # after d
+    "ê": "e1",
+    "ô": "o1",
+    "ơ": "o2",
+    "ư": "u1",
+}
+
+def remove_tone_marks(text):
+    normalized = unicodedata.normalize("NFD", text)
+    return "".join(
+        c for c in normalized
+        if unicodedata.category(c) != "Mn"
+    )
+
+def vietnamese_sort_key(text):
+    text = text.lower()
+
+    # remove tone marks first
+    text = remove_tone_marks(text)
+
+    result = ""
+    for char in text:
+        if char in VI_BASE_ORDER:
+            result += VI_BASE_ORDER[char]
+        else:
+            result += char
+
+    return result
+
 def fetch_medicines():
     session = get_session()
-    medicines = session.query(Thuoc).order_by(Thuoc.Ten).all()
+    medicines = session.query(Thuoc).all()
     session.close()
 
+    medicines_sorted = sorted(
+        medicines,
+        key=lambda t: vietnamese_sort_key(t.Ten)
+    )
 
-    return [(t.Ten, float(t.Gia)) for t in medicines]
-
+    return [(t.Ten, float(t.Gia)) for t in medicines_sorted]
 
 medicines = fetch_medicines()
 ITEMS_PER_PAGE = 8

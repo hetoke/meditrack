@@ -38,4 +38,5 @@ Save prescription will update the updated timestamp every time [resolved]
 Beta v1.33
 Delete buttons: Zoom In, Zoom Out, Add row [resolved]
 Bold text for prescription dose number [resolved]
-Medicine view at least 8 medicine per screen
+Medicine view at least 8 medicine per screen [resolved]
+
