@@ -46,3 +46,7 @@ Benchmark script
 
 1.35
 Add GivenName column for better filtering speed [resolved]
+
+1.36
+Change swap rows into add rows above or below
+Implement append prescription
