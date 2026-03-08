@@ -7,6 +7,8 @@ from datetime import datetime, date
 
 
 from services.record_service import (
+    parse_search_query,
+    name_matches,
     fetch_patient_suggestions,
     create_record,
     update_record,

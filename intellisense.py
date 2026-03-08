@@ -57,14 +57,11 @@ class AutocompleteEntry(tk.Entry):
         if not suggestions:
             return
         
-        matches = [s for s in suggestions if s.lower().startswith(value.lower())]
-        if not matches:
-            return
         
-        self.listbox = tk.Listbox(self.winfo_toplevel(), height=min(5, len(matches)))
+        self.listbox = tk.Listbox(self.winfo_toplevel(), height=min(5, len(suggestions)))
         self.listbox_visible = True
         
-        for m in matches:
+        for m in suggestions:
             self.listbox.insert("end", m)
         
         self.listbox.bind("<Double-Button-1>", self.select_suggestion)

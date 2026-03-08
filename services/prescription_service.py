@@ -2,7 +2,7 @@
 from datetime import date, datetime
 from sqlalchemy.orm import selectinload, joinedload
 
-from db.models import DonThuoc, ChiDinh, Thuoc
+from db.models import DonThuoc, ChiDinh, Thuoc, HoSo
 from db.session import get_session
 
 
@@ -132,6 +132,9 @@ def save_prescription(
             donthuoc_obj = DonThuoc(HoSoID=hoso_id)
 
         donthuoc_obj.NgayLap = datetime.now()
+        hoso_obj = session.get(HoSo, hoso_id)
+        if hoso_obj:
+            hoso_obj.NgayMoHoSo = donthuoc_obj.NgayLap
         donthuoc_obj.MoTa = chandoan_text
 
         donthuoc_obj = session.merge(donthuoc_obj)
@@ -211,6 +214,8 @@ def save_prescription(
 
     finally:
         session.close()
+
+
 def fetch_thuoc_suggestions(prefix: str):
     if not prefix:
         return []

@@ -12,11 +12,12 @@ class HoSo(Base):
 
     HoSoID = Column(Integer, primary_key=True, autoincrement=True)
     Ten = Column(String, nullable=False)
+    GivenName = Column(String, index=True)
     NamSinh = Column(Integer)
     DiaChi = Column(String)
     DienThoai = Column(String)
     TienCan = Column(Text)
-    NgayMoHoSo = Column(Date)
+    NgayMoHoSo = Column(DateTime)
 
     donthuocs = relationship("DonThuoc", back_populates="hoso")
 

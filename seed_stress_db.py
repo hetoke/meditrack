@@ -6,6 +6,20 @@ from sqlalchemy.orm import sessionmaker
 
 from db.models import Base, HoSo, DonThuoc, ChiDinh, Thuoc
 
+FIRST_NAMES = [
+    "Nguyen", "Tran", "Le", "Pham", "Hoang",
+    "Vu", "Vo", "Dang", "Bui", "Do"
+]
+
+MIDDLE_NAMES = [
+    "Van", "Thi", "Minh", "Duc", "Huu", ""
+]
+
+GIVEN_NAMES = [
+    "Anh", "Huy", "Nam", "Linh", "Trang",
+    "Phuong", "Thao", "Tuan", "Khanh", "Dung",
+    "Quang", "Hoa", "Lan", "Hung", "Tien"
+]
 
 DB_URL = "sqlite:///clinic_stress.db"
 
@@ -44,9 +58,13 @@ def seed_data(session, medicines):
     print("Seeding patients + prescriptions...")
 
     for p in range(NUM_PATIENTS):
-
+        first = random.choice(FIRST_NAMES)
+        middle = random.choice(MIDDLE_NAMES)
+        given = random.choice(GIVEN_NAMES)
+        full_name = f"{first} {middle} {given}".strip()
         hoso = HoSo(
-            Ten=f"Patient_{p}",
+            Ten=full_name,
+            GivenName=full_name.split()[-1].lower(),
             NamSinh=random.randint(1950, 2020),
             DiaChi="Stress Address",
             DienThoai=f"09{random.randint(10000000,99999999)}",

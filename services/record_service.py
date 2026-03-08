@@ -1,9 +1,9 @@
 # services/record_service.py
-from datetime import date
+from datetime import date, datetime
 import unicodedata
 import re
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from db.models import HoSo, DonThuoc
 from db.session import get_session
 
@@ -19,13 +19,19 @@ def fetch_records_page(page, page_size, search_query=None):
         query = session.query(HoSo)
 
         if search_query:
-            query = query.filter(HoSo.Ten.ilike(f"%{search_query}%"))
+            name_query, year_query = parse_search_query(search_query)
+
+            if name_query:
+                query = query.filter(HoSo.GivenName == name_query.lower())
+
+            if year_query is not None:
+                query = query.filter(HoSo.NamSinh == year_query)
 
         total = query.count()
 
         rows = (
             query
-            .order_by(HoSo.HoSoID.desc())
+            .order_by(HoSo.NgayMoHoSo.desc())
             .limit(page_size)
             .offset((page - 1) * page_size)
             .all()
@@ -56,11 +62,12 @@ def create_record(name, year, address, phone, tiencan):
     session = get_session()
     hoso = HoSo(
         Ten=name,
+        GivenName=name.strip().split()[-1].lower(),
         NamSinh=int(year) if year else None,
         DiaChi=address,
         DienThoai=phone,
         TienCan=tiencan,
-        NgayMoHoSo=date.today(),
+        NgayMoHoSo=datetime.now(),
     )
     session.add(hoso)
     session.commit()
@@ -98,30 +105,56 @@ def delete_record(hoso_id):
 # -------------------------
 # Search helpers
 # -------------------------
-def remove_accents(s):
-    return "".join(
-        c for c in unicodedata.normalize("NFD", s)
-        if unicodedata.category(c) != "Mn"
-    )
+
 
 
 def parse_search_query(query: str):
-    query_norm = remove_accents(query.strip().lower())
+    query_norm = query.strip()
     if not query_norm:
-        return "", None
+        return None, None
+
     nums = re.findall(r"\d+", query_norm)
     year = int(nums[0]) if nums else None
-    letters = re.findall(r"[a-z]+", query_norm)
-    name = " ".join(letters).strip()
+
+    letters = re.findall(r"[^\W\d_]+", query_norm, re.UNICODE)
+    name = " ".join(letters).strip() or None
+
     return name, year
 
 
 def name_matches(full_name: str, name_query: str):
     if not name_query:
         return True
-    full_norm = remove_accents(full_name.strip().lower())
+    full_norm = full_name.strip()
     return full_norm.endswith(name_query)
 
 
 def fetch_patient_suggestions(query: str):
     name_query, year_query = parse_search_query(query)
+    #print(name_query, year_query)
+
+
+    session = get_session()
+    try:
+        q = session.query(HoSo)
+
+        if name_query:
+            q = q.filter(HoSo.GivenName == name_query.lower())
+
+        if year_query is not None:
+            q = q.filter(HoSo.NamSinh == year_query)
+
+        rows = q.limit(10).all()
+
+        #all_rows = session.query(HoSo.Ten, HoSo.NamSinh).all()
+        #print("ALL DATA:", all_rows)
+        #print("ROWS RETURNED:", rows)
+
+
+        return [
+            f"{r.Ten} ({r.NamSinh})"
+            for r in rows
+        ]
+
+    finally:
+        session.close()

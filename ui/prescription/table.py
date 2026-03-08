@@ -6,6 +6,125 @@ from intellisense import AutocompleteEntry
 from services.prescription_service import fetch_thuoc_suggestions
 
 
+class TableRowFactory:
+    def __init__(self, parent_frame, columns, col_widths, bold_font, sau_an_indices, on_dirty_callback, focus_cell_callback):
+        self.parent_frame = parent_frame
+        self.columns = columns
+        self.col_widths = col_widths
+        self.bold_font = bold_font
+        self.sau_an_indices = sau_an_indices
+        self.on_dirty_callback = on_dirty_callback
+        self.focus_cell_callback = focus_cell_callback
+        self.rows = []
+
+    def create_entry(self, row_obj, col, value=""):
+        if col == 0:
+            entry = AutocompleteEntry(
+                self.parent_frame,
+                fetch_suggestions=fetch_thuoc_suggestions,
+                width=self.col_widths[col],
+            )
+        else:
+            entry = tk.Entry(
+                self.parent_frame,
+                width=self.col_widths[col],
+                font=self.bold_font
+            )
+
+        if value:
+            entry.insert(0, value)
+            if value:
+                self.on_dirty_callback()
+
+        if col in self.sau_an_indices:
+            entry.config(bg="#FFC107")
+
+        entry.bind("<KeyRelease>", lambda *_: self.on_dirty_callback())
+        entry.bind("<FocusOut>", lambda *_: self.on_dirty_callback())
+        
+        return entry
+
+    def create_buttons(self, row_obj, get_row_index_func, swap_rows_func, delete_row_func):
+        btn_del = tb.Button(
+            self.parent_frame,
+            text="X",
+            bootstyle="danger",
+            command=lambda: delete_row_func(row_obj),
+        )
+
+        btn_up = tb.Button(
+            self.parent_frame,
+            text="▲",
+            width=2,
+            command=lambda: swap_rows_func(get_row_index_func(row_obj), get_row_index_func(row_obj) - 1),
+        )
+
+        btn_down = tb.Button(
+            self.parent_frame,
+            text="▼",
+            width=2,
+            command=lambda: swap_rows_func(get_row_index_func(row_obj), get_row_index_func(row_obj) + 1),
+        )
+
+        return {
+            "btn_del": btn_del,
+            "btn_up": btn_up,
+            "btn_down": btn_down,
+        }
+
+    def create_enter_handler(self, row_obj, col, get_row_index_func, columns, focus_cell_callback):
+        def on_enter(event):
+            row_idx = get_row_index_func(row_obj)
+
+            # Medicine column (autocomplete handling)
+            if col == 0:
+                widget = event.widget
+                
+                # If autocomplete is showing
+                if widget.listbox_visible and widget.listbox:
+                    # Select from listbox and close it
+                    widget.select_suggestion()
+                    # Move to next cell after brief delay
+                    widget.after(50, lambda: focus_cell_callback(row_idx, 1))
+                    return "break"
+                
+                # No autocomplete visible, move to next cell immediately
+                focus_cell_callback(row_idx, 1)
+                return "break"
+
+            # Normal columns (not medicine)
+            next_col = col + 1
+            if next_col < len(columns):
+                # Move to next column in same row
+                focus_cell_callback(row_idx, next_col)
+            else:
+                # Last column → create new row and focus on medicine cell
+                focus_cell_callback(row_idx + 1, 0)
+
+            return "break"
+        
+        return on_enter
+
+    def add_row(self, values=None):
+        values = values or [""] * len(self.columns)
+        row_entries = []
+
+        for c in range(len(self.columns)):
+            entry = self.create_entry(None, c, values[c] if c < len(values) else "")
+            row_entries.append(entry)
+
+        row_obj = {"entries": row_entries}
+        self.rows.append(row_obj)
+        return row_obj
+
+    def delete_row(self, row_obj):
+        try:
+            idx = self.rows.index(row_obj)
+        except ValueError:
+            return
+        del self.rows[idx]
+
+
 class PrescriptionTable:
     def __init__(self, parent, donthuoc=None, seed_rows=None, seed_chandoan=None):
         self.frame = tb.Frame(parent, padding=10)
@@ -22,6 +141,8 @@ class PrescriptionTable:
         self.grid_frame = None
         self.row_count = 0
         self.col_widths = [22, 6, 6, 6, 6, 6, 6, 6]
+        self.columns = ["Thuốc", "Sáng trước ăn", "Sáng sau ăn", "Trưa trước ăn", "Trưa sau ăn", "Chiều trước ăn", "Chiều sau ăn", "Tối"]
+        self.sau_an_indices = {2, 4, 6}
 
         default_font = tkfont.nametofont("TkDefaultFont")
         self.bold_font = default_font.copy()
@@ -70,9 +191,6 @@ class PrescriptionTable:
     # -------------------------------------------------
 
     def _build_table(self, seed_rows=None):
-        columns = ["Thuốc", "Sáng trước ăn", "Sáng sau ăn", "Trưa trước ăn", "Trưa sau ăn", "Chiều trước ăn", "Chiều sau ăn", "Tối"]
-        sau_an_indices = {2, 4, 6}
-
         table_outer = tb.Frame(self.frame)
         table_outer.pack(fill="both", expand=True, padx=20, pady=(2, 6))
 
@@ -86,10 +204,8 @@ class PrescriptionTable:
         self.grid_frame = tb.Frame(canvas)
         window_id = canvas.create_window((0, 0), window=self.grid_frame, anchor="nw")
 
-        for c in range(len(columns)):
+        for c in range(len(self.columns)):
             self.grid_frame.columnconfigure(c * 2, minsize=40)
-
-
 
         EDGE_THRESHOLD = 6  # pixels
 
@@ -123,13 +239,10 @@ class PrescriptionTable:
         def on_cell_release(event):
             self._resize_col = None
 
-
         def apply_column_width(col):
             w = self.col_widths[col]
             for row in self.entries:
                 row["entries"][col].config(width=w)
-
-
 
         def on_canvas_configure(event):
             canvas.itemconfigure(window_id, width=event.width)
@@ -139,7 +252,6 @@ class PrescriptionTable:
 
         canvas.bind("<Configure>", on_canvas_configure)
         self.grid_frame.bind("<Configure>", on_frame_configure)
-
 
         def focus_cell(row_idx, col_idx):
             if row_idx < 0:
@@ -161,17 +273,37 @@ class PrescriptionTable:
             for i, row in enumerate(self.entries):
                 for c, e in enumerate(row["entries"]):
                     e.grid(row=i, column=c * 2, sticky="nsew", padx=1, pady=1)
-                base = len(columns) * 2
+                base = len(self.columns) * 2
 
                 row["btn_del"].grid(row=i, column=base)
                 row["btn_up"].grid(row=i, column=base + 1)
                 row["btn_down"].grid(row=i, column=base + 2)
 
+        def delete_row(row_obj):
+            idx = get_row_index(row_obj)
+            for w in row_obj["entries"] + [
+                row_obj["btn_del"],
+                row_obj["btn_up"],
+                row_obj["btn_down"],
+            ]:
+                w.destroy()
+            self.entries.pop(idx)
+            refresh_grid()
+            self._mark_dirty()
+
+        def swap_rows(i, j):
+            if i < 0 or j < 0 or i >= len(self.entries) or j >= len(self.entries):
+                return
+            self.entries[i], self.entries[j] = self.entries[j], self.entries[i]
+            refresh_grid()
+            self._mark_dirty()
+
         def add_row(values=None):
             row_entries = []
-            values = values or [""] * len(columns)
+            values = values or [""] * len(self.columns)
 
-            for c in range(len(columns)):
+            # Create entries using factory
+            for c in range(len(self.columns)):
                 if c == 0:
                     e = AutocompleteEntry(
                         self.grid_frame,
@@ -190,7 +322,7 @@ class PrescriptionTable:
                     if values[c]:
                         self.dirty = True
 
-                if c in sau_an_indices:
+                if c in self.sau_an_indices:
                     e.config(bg="#FFC107")
 
                 e.bind("<KeyRelease>", lambda *_: self._mark_dirty())
@@ -204,6 +336,7 @@ class PrescriptionTable:
 
             row_obj = {"entries": row_entries}
 
+            # Create buttons using factory
             btn_del = tb.Button(
                 self.grid_frame,
                 text="X",
@@ -239,6 +372,7 @@ class PrescriptionTable:
 
             self.entries.append(row_obj)
 
+            # Create enter handlers using factory logic
             def make_on_enter(row_obj, col):
                 def on_enter(event):
                     row_idx = get_row_index(row_obj)
@@ -261,7 +395,7 @@ class PrescriptionTable:
 
                     # Normal columns (not medicine)
                     next_col = col + 1
-                    if next_col < len(columns):
+                    if next_col < len(self.columns):
                         # Move to next column in same row
                         focus_cell(row_idx, next_col)
                     else:
@@ -272,37 +406,11 @@ class PrescriptionTable:
 
                 return on_enter
 
-            def delete_row(row_obj):
-                idx = get_row_index(row_obj)
-                for w in row_obj["entries"] + [
-                    row_obj["btn_del"],
-                    row_obj["btn_up"],
-                    row_obj["btn_down"],
-                ]:
-                    w.destroy()
-                self.entries.pop(idx)
-                refresh_grid()
-                self._mark_dirty()
-
-            def swap_rows(i, j):
-                if i < 0 or j < 0 or i >= len(self.entries) or j >= len(self.entries):
-                    return
-                self.entries[i], self.entries[j] = self.entries[j], self.entries[i]
-                refresh_grid()
-                self._mark_dirty()
-
-            # **BIND THE ENTER KEY TO EACH ENTRY**
+            # BIND THE ENTER KEY TO EACH ENTRY
             for c, e in enumerate(row_entries):
                 e.bind("<Return>", make_on_enter(row_obj, c))
 
             refresh_grid()
-            canvas.update_idletasks()
-            canvas.configure(scrollregion=canvas.bbox("all"))
-
-
-    
-            
-            
             canvas.update_idletasks()
             canvas.configure(scrollregion=canvas.bbox("all"))
 
@@ -324,7 +432,6 @@ class PrescriptionTable:
                 add_row(row)
         else:
             add_row()
-
 
     # -------------------------------------------------
     # Internal

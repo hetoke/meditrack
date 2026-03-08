@@ -57,6 +57,7 @@ def fetch_medicines():
         key=lambda t: vietnamese_sort_key(t.Ten)
     )
 
+
     return [(t.Ten, float(t.Gia)) for t in medicines_sorted]
 
 medicines = fetch_medicines()
@@ -139,8 +140,18 @@ def show_thuoc_window(root, page_container, show_primary_window):
     search_frame.pack(fill="x", padx=20, pady=10)
 
     tb.Label(search_frame, text="🔍").pack(side="left")
+    
     def fetch_suggestions(query):
-        return [name for name, _ in medicines]
+        if not query:
+            return []
+
+        q = query.strip().lower()
+
+        return [
+            name
+            for name, _ in medicines
+            if name.lower().startswith(q)
+        ]
 
     search_entry = AutocompleteEntry(search_frame, width=100, fetch_suggestions=fetch_suggestions)
     search_entry.pack(side="left", padx=5)
