@@ -3,3 +3,8 @@ build/
 dist/
 *.spec
 .aider*
+
+# Database
+*.db
+*.sqlite
+*.sqlite3

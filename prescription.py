@@ -205,6 +205,63 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
 
         show_prescription(len(prescriptions) - 1)
 
+    def append_to_newest_prescription(prescriptions, current_index):
+        """
+        Copy all medicine rows from the current prescription to the newest prescription,
+        avoiding duplicates by medicine name (column 0), case-sensitive.
+        """
+        if not prescriptions:
+            return
+
+        current_prescription = prescriptions[current_index["value"]]
+        newest_index = len(prescriptions) - 1
+        newest_prescription = prescriptions[newest_index]
+
+        # Collect existing medicine names in newest prescription
+        existing_meds = set()
+        for row in newest_prescription.entries:
+            med_name = row["entries"][0].get().strip()
+            if med_name:
+                existing_meds.add(med_name)
+
+        # Collect rows from current prescription
+        rows_to_add = []
+        for row in current_prescription.entries:
+            med_name = row["entries"][0].get().strip()
+            if med_name and med_name not in existing_meds:
+                # Copy the entire row (all columns)
+                new_row_values = [e.get().strip() for e in row["entries"]]
+                rows_to_add.append(new_row_values)
+                existing_meds.add(med_name)
+
+        if not rows_to_add:
+            messagebox.showinfo(
+                "Thông báo",
+                "Không có thuốc mới để thêm (có thể đã tồn tại trong đơn mới nhất)!"
+            )
+            return
+
+        # Insert rows at the end of newest prescription
+        for values in rows_to_add:
+            newest_prescription.add_row(values)
+
+        # Mark newest prescription as dirty
+        newest_prescription._mark_dirty()
+
+        # Scroll to the bottom to show the newly added rows
+        canvas = newest_prescription.grid_frame.master
+        canvas.update_idletasks()
+        canvas.yview_moveto(1.0)
+
+        # Focus first entry of last added row
+        newest_prescription.entries[-1]["entries"][0].focus_set()
+
+        messagebox.showinfo(
+            "Thông báo",
+            f"Đã thêm {len(rows_to_add)} thuốc vào đơn mới nhất."
+        )
+
+
     def delete_prescription(index):
         t = prescriptions[index]
 
@@ -274,6 +331,12 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
     next_btn.config(command=next_prescription)
     tb.Button(sidebar_actions, text="+ Thêm đơn thuốc", bootstyle="success",
               command=add_prescription).pack(fill="x", pady=2)
+    tb.Button(
+        sidebar_actions,
+        text="⤓ Ghép thuốc vào đơn mới nhất",
+        bootstyle="info",
+        command=lambda: append_to_newest_prescription(prescriptions, current_index)
+    ).pack(fill="x", pady=2)
     tb.Button(sidebar_actions, text="⎘ Nhân bản đơn hiện tại", bootstyle="secondary",
               command=duplicate_prescription).pack(fill="x", pady=2)
     tb.Button(sidebar_actions, text="💾 Lưu đơn thuốc hiện tại", bootstyle="primary",

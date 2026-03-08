@@ -129,7 +129,6 @@ class PrescriptionTable:
         self._resize_start_width = 0
 
         self.grid_frame = None
-        self.row_count = 0
         self.col_widths = [22, 6, 6, 6, 6, 6, 6, 6]
         self.columns = ["Thuốc", "Sáng trước ăn", "Sáng sau ăn", "Trưa trước ăn", "Trưa sau ăn", "Chiều trước ăn", "Chiều sau ăn", "Tối"]
         self.sau_an_indices = {2, 4, 6}
@@ -346,9 +345,16 @@ class PrescriptionTable:
         else:
             add_row()
 
-    # -------------------------------------------------
-    # Internal
-    # -------------------------------------------------
+        self._add_row_at_index = add_row_at_index
+
+    def add_row(self, values=None, index=None):
+        """Add a row at the end (or at a specific index)"""
+        if not hasattr(self, "_add_row_at_index"):
+            raise RuntimeError("Table not yet initialized")
+        if index is None:
+            index = len(self.entries)
+        self._add_row_at_index(index, values)
+
 
     def _mark_dirty(self):
         self.dirty = True
