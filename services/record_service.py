@@ -3,7 +3,7 @@ from datetime import date, datetime
 import unicodedata
 import re
 
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, case
 from db.models import HoSo, DonThuoc
 from db.session import get_session
 
@@ -12,23 +12,37 @@ from db.session import get_session
 # Fetch
 # -------------------------
 
-def fetch_records_page(page, page_size, search_query=None):
-    session = get_session()
+def _apply_search_filters(query, search_query: str, exact_given_name=False):
+    name_query, year_query = parse_search_query(search_query)
+    if name_query:
+        pattern = f"%{name_query}%"
+        query = query.filter(
+            or_(
+                HoSo.GivenName.ilike(pattern),
+                HoSo.Ten.ilike(pattern),
+            )
+        )
+        query = query.order_by(
+            case(
+                (HoSo.GivenName == name_query.lower(), 1),
+                (HoSo.GivenName.ilike(pattern), 2),
+                (HoSo.Ten.ilike(pattern), 3),
+                else_=4
+            )
+        )
+    if year_query is not None:
+        query = query.filter(HoSo.NamSinh == year_query)
+    return query
 
+
+def fetch_records_page(page, page_size, search_query=None, count=True):
+    session = get_session()
     try:
         query = session.query(HoSo)
-
         if search_query:
-            name_query, year_query = parse_search_query(search_query)
-
-            if name_query:
-                query = query.filter(HoSo.GivenName == name_query.lower())
-
-            if year_query is not None:
-                query = query.filter(HoSo.NamSinh == year_query)
-
-        total = query.count()
-
+            query = _apply_search_filters(query, search_query)
+        
+        total = query.count() if count else None
         rows = (
             query
             .order_by(HoSo.NgayMoHoSo.desc())
@@ -36,22 +50,19 @@ def fetch_records_page(page, page_size, search_query=None):
             .offset((page - 1) * page_size)
             .all()
         )
-
-        result = [
-            (
-                r.HoSoID,
-                r.Ten,
-                r.NamSinh,
-                r.DiaChi,
-                r.DienThoai,
-                r.TienCan,
-                r.NgayMoHoSo
-            )
-            for r in rows
-        ]
-
+        result = [(r.HoSoID, r.Ten, r.NamSinh, r.DiaChi,
+                   r.DienThoai, r.TienCan, r.NgayMoHoSo) for r in rows]
         return result, total
+    finally:
+        session.close()
 
+
+def fetch_patient_suggestions(query: str):
+    session = get_session()
+    try:
+        q = _apply_search_filters(session.query(HoSo), query)
+        rows = q.limit(10).all()
+        return [f"{r.Ten} - {r.NamSinh}" for r in rows]
     finally:
         session.close()
 
@@ -122,39 +133,5 @@ def parse_search_query(query: str):
     return name, year
 
 
-def name_matches(full_name: str, name_query: str):
-    if not name_query:
-        return True
-    full_norm = full_name.strip()
-    return full_norm.endswith(name_query)
 
 
-def fetch_patient_suggestions(query: str):
-    name_query, year_query = parse_search_query(query)
-    #print(name_query, year_query)
-
-
-    session = get_session()
-    try:
-        q = session.query(HoSo)
-
-        if name_query:
-            q = q.filter(HoSo.GivenName == name_query.lower())
-
-        if year_query is not None:
-            q = q.filter(HoSo.NamSinh == year_query)
-
-        rows = q.limit(10).all()
-
-        #all_rows = session.query(HoSo.Ten, HoSo.NamSinh).all()
-        #print("ALL DATA:", all_rows)
-        #print("ROWS RETURNED:", rows)
-
-
-        return [
-            f"{r.Ten} ({r.NamSinh})"
-            for r in rows
-        ]
-
-    finally:
-        session.close()

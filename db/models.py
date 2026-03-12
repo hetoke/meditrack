@@ -11,7 +11,7 @@ class HoSo(Base):
     __tablename__ = "hoso"
 
     HoSoID = Column(Integer, primary_key=True, autoincrement=True)
-    Ten = Column(String, nullable=False)
+    Ten = Column(String, nullable=False, index=True)
     GivenName = Column(String, index=True)
     NamSinh = Column(Integer)
     DiaChi = Column(String)

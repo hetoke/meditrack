@@ -8,7 +8,6 @@ from datetime import datetime, date
 
 from services.record_service import (
     parse_search_query,
-    name_matches,
     fetch_patient_suggestions,
     create_record,
     update_record,
@@ -89,21 +88,38 @@ def show_ho_so_window(root, container, show_primary_window, controller=None):
     tb.Button(container, text="⬅ Quay lại", bootstyle="secondary",
               command=lambda: show_primary_window(root, container)).pack(pady=20)
     
+    _search_after_id = {"id": None}
 
     def on_search_change(*args):
         controller.current_page = 1
         current_search_query["value"] = search_entry.get().strip()
 
+        if _search_after_id["id"]:
+            search_entry.after_cancel(_search_after_id["id"])
+
+        _search_after_id["id"] = search_entry.after(100, lambda: render_record_list(
+            root, record_frame, page_label,
+            show_primary_window, controller,
+            current_search_query["value"]
+        ))
+    
+
+    def on_suggestion_selected(*args):
+        if _search_after_id["id"]:
+            search_entry.after_cancel(_search_after_id["id"])
+            _search_after_id["id"] = None
+
+        current_search_query["value"] = search_entry.get().strip()
+        controller.current_page = 1
         render_record_list(
-            root,
-            record_frame,
-            page_label,
-            show_primary_window,
-            controller,
+            root, record_frame, page_label,
+            show_primary_window, controller,
             current_search_query["value"]
         )
-    search_entry.var.trace_add("write", on_search_change)
 
+
+    search_entry.var.trace_add("write", on_search_change)
+    search_entry.bind("<<AutocompleteSelected>>", lambda e: on_suggestion_selected())
     # Initial render
     render_record_list(
         root,
@@ -149,14 +165,15 @@ def bind_card_click(widget, callback, exclude_widget=None):
         bind_card_click(child, callback, exclude_widget)
 
 def render_record_list(root, container, page_label, show_primary_window, controller, search_query=None):
-    
     record_list = controller.get_page(
         controller.current_page,
         ITEMS_PER_PAGE,
         search_query
     )
 
-    for w in container.winfo_children():
+    # Only destroy/recreate if count changed, otherwise reuse frames
+    existing = container.winfo_children()
+    for w in existing:
         w.destroy()
 
     for record in record_list:
@@ -171,11 +188,7 @@ def render_record_list(root, container, page_label, show_primary_window, control
         left = tb.Frame(row)
         left.pack(side="left", fill="x", expand=True)
 
-        tb.Label(
-            left,
-            text=f"{name} ({year})",
-            font=("Quicksand", 12)
-        ).pack(anchor="w")
+        tb.Label(left, text=f"{name} - {year}", font=("Quicksand", 12)).pack(anchor="w")
 
         btn_frame = tb.Frame(row, width=300, height=28)
         btn_frame.pack(side="right")
@@ -185,18 +198,14 @@ def render_record_list(root, container, page_label, show_primary_window, control
         btn_inner.pack(expand=True)
 
         tb.Button(
-            btn_inner,
-            text="✏ Sửa hồ sơ",
-            style="CompactInfo.TButton",
+            btn_inner, text="✏ Sửa hồ sơ", style="CompactInfo.TButton",
             command=lambda rid=hoso_id, r=record: show_edit_ho_so_window(
                 root, container.master, show_primary_window, controller, rid, r
             )
         ).pack(side="left", padx=2)
 
         tb.Button(
-            btn_inner,
-            text="🗑 Xoá hồ sơ",
-            style="CompactDanger.TButton",
+            btn_inner, text="🗑 Xoá hồ sơ", style="CompactDanger.TButton",
             command=lambda rid=hoso_id: delete_ho_so(
                 root, container, show_primary_window,
                 controller, page_label, rid, search_query
@@ -207,10 +216,8 @@ def render_record_list(root, container, page_label, show_primary_window, control
         right.pack(side="right", padx=10)
 
         tb.Label(
-            right,
-            text=format_last_modified(last_modified),
-            font=("Quicksand", 10),
-            foreground="#6c757d"
+            right, text=format_last_modified(last_modified),
+            font=("Quicksand", 10), foreground="#6c757d"
         ).pack(anchor="e")
 
         click_handler = lambda e, r=record: open_detail(
@@ -218,11 +225,7 @@ def render_record_list(root, container, page_label, show_primary_window, control
         )
         bind_card_click(card, click_handler, exclude_widget=btn_frame)
 
-    max_page = max(
-        1,
-        (controller.total_records + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
-    )
-
+    max_page = max(1, (controller.total_records + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
     page_label.config(text=f"Page {controller.current_page} / {max_page}")
 
 # -------------------------
