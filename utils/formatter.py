@@ -7,7 +7,7 @@ def safe_float(value):
         return 0.0
 
 def format_currency(value):
-    return f"{value:,.0f} đ"
+    return f"{value:,.0f}"
 
 def format_ngaylap(value):
     if isinstance(value, datetime):
