@@ -4,6 +4,20 @@ import tkinter.font as tkfont
 
 from intellisense import AutocompleteEntry
 from services.prescription_service import fetch_thuoc_suggestions
+from utils.formatter import safe_float
+
+
+def format_dose_value(value):
+    if value in (None, ""):
+        return ""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+
+    if number.is_integer():
+        return str(int(number))
+    return f"{number:.10f}".rstrip("0").rstrip(".")
 
 
 class TableRowFactory:
@@ -17,6 +31,11 @@ class TableRowFactory:
 
     def create_row_structure(self, values=None):
         """Creates the basic structure of a row - returns entries and buttons"""
+        excluded = False
+        if isinstance(values, dict):
+            excluded = values.get("excluded", False)
+            values = values.get("entries", [])
+
         values = values or [""] * len(self.columns)
         row_entries = []
 
@@ -27,6 +46,7 @@ class TableRowFactory:
                     self.parent_frame,
                     fetch_suggestions=fetch_thuoc_suggestions,
                     width=self.col_widths[c],
+                    font=self.bold_font,
                 )
             else:
                 entry = tk.Entry(
@@ -35,10 +55,16 @@ class TableRowFactory:
                     font=self.bold_font
                 )
 
+            entry.config(
+                relief="solid",
+                bd=1,
+                highlightthickness=1,
+                highlightbackground="black",
+                highlightcolor="black",
+            )
+
             if c < len(values):
-                entry.insert(0, values[c])
-                if values[c]:
-                    self.on_dirty_callback()
+                entry.insert(0, format_dose_value(values[c]) if c > 0 else values[c])
 
             if c in self.sau_an_indices:
                 entry.config(bg="#FFC107")
@@ -64,17 +90,24 @@ class TableRowFactory:
             width=2,
         )
 
+        btn_toggle_money = tb.Button(
+            self.parent_frame,
+            text="T$",
+            width=3,
+        )
+
         return {
             "entries": row_entries,
             "btn_del": btn_del,
             "btn_insert_above": btn_insert_above,
             "btn_insert_below": btn_insert_below,
+            "btn_toggle_money": btn_toggle_money,
+            "exclude_from_total": excluded,
         }
 
     def setup_entry_events(self, entry, col, on_cell_motion, on_cell_press, on_cell_drag, on_cell_release):
         """Setup all the event bindings for an entry"""
         entry.bind("<KeyRelease>", lambda *_: self.on_dirty_callback())
-        entry.bind("<FocusOut>", lambda *_: self.on_dirty_callback())
         entry.bind("<Motion>", lambda ev, col=col: on_cell_motion(ev, col))
         entry.bind("<Button-1>", lambda ev, col=col: on_cell_press(ev, col))
         entry.bind("<B1-Motion>", on_cell_drag)
@@ -116,20 +149,21 @@ class TableRowFactory:
 
 
 class PrescriptionTable:
-    def __init__(self, parent, donthuoc=None, seed_rows=None, seed_chandoan=None):
+    def __init__(self, parent, donthuoc=None, seed_rows=None, seed_chandoan=None, on_change=None):
         self.frame = tb.Frame(parent, padding=10)
 
         self.donthuoc = donthuoc
         self.entries = []
         self.dirty = False
         self.zoom = 1.0
+        self.on_change = on_change
 
         self._resize_col = None
         self._resize_start_x = 0
         self._resize_start_width = 0
 
         self.grid_frame = None
-        self.col_widths = [22, 6, 6, 6, 6, 6, 6, 6]
+        self.col_widths = [18, 4, 4, 4, 4, 4, 4, 4]
         self.columns = ["Thuốc", "Sáng trước ăn", "Sáng sau ăn", "Trưa trước ăn", "Trưa sau ăn", "Chiều trước ăn", "Chiều sau ăn", "Tối"]
         self.sau_an_indices = {2, 4, 6}
 
@@ -277,6 +311,13 @@ class PrescriptionTable:
                 row["btn_del"].grid(row=i, column=base)
                 row["btn_insert_above"].grid(row=i, column=base + 1)
                 row["btn_insert_below"].grid(row=i, column=base + 2)
+                row["btn_toggle_money"].grid(row=i, column=base + 3, padx=(2, 0))
+
+        def update_row_money_button(row_obj):
+            if row_obj["exclude_from_total"]:
+                row_obj["btn_toggle_money"].config(text="No$", bootstyle="warning")
+            else:
+                row_obj["btn_toggle_money"].config(text="T$", bootstyle="success")
 
         def delete_row(row_obj):
             idx = get_row_index(row_obj)
@@ -284,6 +325,7 @@ class PrescriptionTable:
                 row_obj["btn_del"],
                 row_obj["btn_insert_above"],
                 row_obj["btn_insert_below"],
+                row_obj["btn_toggle_money"],
             ]:
                 w.destroy()
             self.entries.pop(idx)
@@ -296,6 +338,17 @@ class PrescriptionTable:
         def insert_row_below(index):
             add_row_at_index(index + 1)
 
+        def toggle_row_money(row_obj):
+            row_obj["exclude_from_total"] = not row_obj["exclude_from_total"]
+            update_row_money_button(row_obj)
+            self._mark_dirty()
+
+        def normalize_numeric_entry(entry):
+            value = entry.get().strip()
+            formatted = format_dose_value(value)
+            entry.delete(0, "end")
+            entry.insert(0, formatted)
+
         def add_row_at_index(index, values=None):
             # Use factory to create row structure
             row_obj = factory.create_row_structure(values)
@@ -304,10 +357,19 @@ class PrescriptionTable:
             row_obj["btn_del"].config(command=lambda ro=row_obj: delete_row(ro))
             row_obj["btn_insert_above"].config(command=lambda ro=row_obj: insert_row_above(get_row_index(ro)))
             row_obj["btn_insert_below"].config(command=lambda ro=row_obj: insert_row_below(get_row_index(ro)))
+            row_obj["btn_toggle_money"].config(command=lambda ro=row_obj: toggle_row_money(ro))
+            update_row_money_button(row_obj)
 
             # Setup entry events
             for c, entry in enumerate(row_obj["entries"]):
                 factory.setup_entry_events(entry, c, on_cell_motion, on_cell_press, on_cell_drag, on_cell_release)
+                if c > 0:
+                    entry.bind(
+                        "<FocusOut>",
+                        lambda _event, e=entry: (normalize_numeric_entry(e), self._mark_dirty()),
+                    )
+                else:
+                    entry.bind("<FocusOut>", lambda *_: self._mark_dirty())
                 
                 # Setup enter key handler
                 enter_handler = factory.create_enter_handler(row_obj, c, get_row_index, focus_cell)
@@ -329,16 +391,19 @@ class PrescriptionTable:
         # ---- Seed data ----
         if self.donthuoc and getattr(self.donthuoc, "chidinh_list", None):
             for chi in self.donthuoc.chidinh_list:
-                add_row([
-                    chi.thuoc.Ten if chi.thuoc else "",
-                    chi.SangTruocAn or "",
-                    chi.SangSauAn or "",
-                    chi.TruaTruocAn or "",
-                    chi.TruaSauAn or "",
-                    chi.ChieuTruocAn or "",
-                    chi.ChieuSauAn or "",
-                    chi.Toi or "",
-                ])
+                add_row({
+                    "entries": [
+                        chi.thuoc.Ten if chi.thuoc else "",
+                        chi.SangTruocAn or "",
+                        chi.SangSauAn or "",
+                        chi.TruaTruocAn or "",
+                        chi.TruaSauAn or "",
+                        chi.ChieuTruocAn or "",
+                        chi.ChieuSauAn or "",
+                        chi.Toi or "",
+                    ],
+                    "excluded": bool(getattr(chi, "KhongTinhTien", 0)),
+                })
         elif seed_rows:
             for row in seed_rows:
                 add_row(row)
@@ -355,6 +420,24 @@ class PrescriptionTable:
             index = len(self.entries)
         self._add_row_at_index(index, values)
 
+    def get_total(self, price_lookup):
+        total = 0.0
+        for row in self.entries:
+            if row["exclude_from_total"]:
+                continue
+
+            name = row["entries"][0].get().strip()
+            if not name:
+                continue
+
+            price = float(price_lookup.get(name, 0) or 0)
+            doses = [safe_float(entry.get().strip()) for entry in row["entries"][1:]]
+            total += sum(doses) * price
+
+        return total
+
 
     def _mark_dirty(self):
         self.dirty = True
+        if self.on_change:
+            self.on_change()

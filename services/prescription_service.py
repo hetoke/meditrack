@@ -14,6 +14,8 @@ def calculate_total_from_donthuoc(donthuoc_obj):
 
     total = 0.0
     for chi in donthuoc_obj.chidinh_list:
+        if getattr(chi, "KhongTinhTien", 0):
+            continue
         price = float(chi.thuoc.Gia or 0) if chi.thuoc else 0.0
         dose = (
             safe_float(chi.SangTruocAn)
@@ -100,6 +102,12 @@ def normalize_cells(row):
     return [str(v).strip() for v in row]
 
 
+def is_row_excluded(row):
+    if isinstance(row, dict):
+        return bool(row.get("excluded", False))
+    return False
+
+
 def save_prescription(
     hoso_id,
     donthuoc_obj,
@@ -151,7 +159,11 @@ def save_prescription(
         total_cost = 0.0
 
         # 5️⃣ Create ChiDinh rows
-        for values in valid_rows:
+        for row in entry_rows:
+            values = normalize_cells(row)
+            if not any(values):
+                continue
+
             name = values[0]
             thuoc_obj = thuoc_map.get(name)
 
@@ -160,8 +172,10 @@ def save_prescription(
 
             price = float(thuoc_obj.Gia or 0)
             doses = [safe_float(v) for v in values[1:8]]
+            excluded = is_row_excluded(row)
 
-            total_cost += sum(doses) * price
+            if not excluded:
+                total_cost += sum(doses) * price
 
             chi = ChiDinh(
                 DonThuocID=donthuoc_obj.DonThuocID,
@@ -173,6 +187,7 @@ def save_prescription(
                 ChieuTruocAn=doses[4],
                 ChieuSauAn=doses[5],
                 Toi=doses[6],
+                KhongTinhTien=1 if excluded else 0,
             )
 
             session.add(chi)
@@ -211,5 +226,18 @@ def fetch_thuoc_suggestions(prefix: str):
             .limit(20)
             .all()
         ]
+    finally:
+        session.close()
+
+
+def fetch_thuoc_price_map(names):
+    names = [name for name in names if name]
+    if not names:
+        return {}
+
+    session = get_session()
+    try:
+        rows = session.query(Thuoc).filter(Thuoc.Ten.in_(names)).all()
+        return {row.Ten: float(row.Gia or 0) for row in rows}
     finally:
         session.close()

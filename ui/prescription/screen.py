@@ -3,10 +3,10 @@ import tkinter as tk
 from tkinter import messagebox
 
 from services.prescription_service import (
-    calculate_total_from_donthuoc,
     delete_prescription_by_id,
     fetch_prescription_detail_by_id,
     fetch_prescription_summaries_by_hoso,
+    fetch_thuoc_price_map,
     save_prescription,
 )
 from ui.prescription.table import PrescriptionTable
@@ -17,15 +17,18 @@ from utils.tk_helpers import clear_parents
 def collect_prescription_rows(entries):
     rows = []
     for row in entries:
-        cells = row["entries"]
         values = []
-        for entry in cells:
+        for entry in row["entries"]:
             if hasattr(entry, "get"):
                 values.append(entry.get().strip())
             else:
                 values.append(str(entry).strip())
+
         if any(values):
-            rows.append(values)
+            rows.append({
+                "entries": values,
+                "excluded": row.get("exclude_from_total", False),
+            })
     return rows
 
 
@@ -46,7 +49,10 @@ def append_to_newest_prescription(prescriptions, current_index):
     for row in current_prescription.entries:
         med_name = row["entries"][0].get().strip()
         if med_name and med_name not in existing_meds:
-            rows_to_add.append([e.get().strip() for e in row["entries"]])
+            rows_to_add.append({
+                "entries": [e.get().strip() for e in row["entries"]],
+                "excluded": row.get("exclude_from_total", False),
+            })
             existing_meds.add(med_name)
 
     if not rows_to_add:
@@ -128,6 +134,15 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
     date_label = tb.Label(sidebar_nav, text="")
     date_label.pack(fill="x", pady=2)
 
+    def update_sidebar_total(table):
+        if not table:
+            sidebar_total_label.config(text=f"T: {format_currency(0)}")
+            return
+
+        medicine_names = [row["entries"][0].get().strip() for row in table.entries]
+        total_value = table.get_total(fetch_thuoc_price_map(medicine_names))
+        sidebar_total_label.config(text=f"T: {format_currency(total_value)}")
+
     def show_prescription(index):
         for table in prescriptions:
             if table:
@@ -136,6 +151,7 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
         if prescriptions[index] is None:
             don = fetch_prescription_detail_by_id(prescription_ids[index])
             prescriptions[index] = PrescriptionTable(content, don)
+            prescriptions[index].on_change = lambda idx=index: update_sidebar_total(prescriptions[idx])
 
         table = prescriptions[index]
         table.pack(fill="both", expand=True)
@@ -148,8 +164,7 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
         else:
             date_label.config(text="")
 
-        total_value = calculate_total_from_donthuoc(table.donthuoc)
-        sidebar_total_label.config(text=f"T: {format_currency(total_value)}")
+        update_sidebar_total(table)
 
         prev_btn.config(state=("disabled" if index == 0 else "normal"))
         next_btn.config(state=("disabled" if index == len(prescriptions) - 1 else "normal"))
@@ -164,6 +179,7 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
 
     def add_prescription():
         table = PrescriptionTable(content)
+        table.on_change = lambda: update_sidebar_total(table)
         prescriptions.append(table)
         show_prescription(len(prescriptions) - 1)
 
@@ -175,7 +191,8 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
         rows = collect_prescription_rows(source.entries)
         chandoan = source.chandoan_text.get("1.0", "end").strip()
 
-        table = PrescriptionTable(content, seed_rows=[[e for e in row] for row in rows], seed_chandoan=chandoan)
+        table = PrescriptionTable(content, seed_rows=rows, seed_chandoan=chandoan)
+        table.on_change = lambda: update_sidebar_total(table)
         table.dirty = True
         prescriptions.append(table)
         show_prescription(len(prescriptions) - 1)
@@ -196,6 +213,7 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
             show_prescription(min(index, len(prescriptions) - 1))
         else:
             new_table = PrescriptionTable(content)
+            new_table.on_change = lambda: update_sidebar_total(new_table)
             prescriptions.append(new_table)
             show_prescription(0)
 
@@ -206,7 +224,7 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
         try:
             table = prescriptions[current_index["value"]]
             rows = collect_prescription_rows(table.entries)
-            don_obj, total_cost = save_prescription(
+            don_obj, _total_cost = save_prescription(
                 hoso_id,
                 table.donthuoc,
                 table.chandoan_text.get("1.0", "end").strip(),
@@ -221,11 +239,13 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
         if don_obj and don_obj.NgayLap:
             date_label.config(text=f"Ngày lập đơn thuốc: {format_ngaylap(don_obj.NgayLap)}")
 
-        sidebar_total_label.config(text=f"T: {format_currency(total_cost)}")
+        update_sidebar_total(table)
         messagebox.showinfo("Thông báo", "Đã lưu đơn thuốc thành công!")
 
     if not prescription_ids:
-        prescriptions = [PrescriptionTable(content)]
+        initial_table = PrescriptionTable(content)
+        initial_table.on_change = lambda: update_sidebar_total(initial_table)
+        prescriptions = [initial_table]
     else:
         prescriptions = [None] * len(prescription_ids)
 

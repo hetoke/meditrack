@@ -50,3 +50,13 @@ Add GivenName column for better filtering speed [resolved]
 1.36
 Change swap rows into add rows above or below [resolved]
 Implement append prescription [resolved]
+
+1.37
+Including record searching by fullname [resolved]
+
+1.38
+whole number in doses truncated ending zeros
+lower the size of number cell in prescription (contain at most 2 decimal places)
+flag button for no money calculation on specified row
+medicine name and doses as bold text
+border line in prescription table as black
