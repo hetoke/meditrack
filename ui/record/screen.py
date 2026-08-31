@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Any, Callable, Optional
+
 import ttkbootstrap as tb
 from tkinter import messagebox
 
@@ -8,14 +12,19 @@ from ui.record.forms import show_add_ho_so_window, show_edit_ho_so_window
 from ui.record.helpers import bind_card_click, format_last_modified, open_detail
 
 
-ITEMS_PER_PAGE = 15
+ITEMS_PER_PAGE: int = 15
 
 
-def show_ho_so_window(root, container, show_primary_window, controller=None):
+def show_ho_so_window(
+    root: tb.Window,
+    container: tb.Frame,
+    show_primary_window: Callable[..., None],
+    controller: Optional[RecordController] = None,
+) -> None:
     for w in container.winfo_children():
         w.destroy()
 
-    current_search_query = {"value": None}
+    current_search_query: dict[str, Optional[str]] = {"value": None}
     if controller is None:
         controller = RecordController()
 
@@ -43,6 +52,8 @@ def show_ho_so_window(root, container, show_primary_window, controller=None):
     pagination_frame = tb.Frame(container)
     pagination_frame.pack(pady=10)
 
+    page_label = tb.Label(pagination_frame, text="")
+
     tb.Button(
         pagination_frame,
         text="← Trước",
@@ -57,7 +68,6 @@ def show_ho_so_window(root, container, show_primary_window, controller=None):
         ),
     ).pack(side="left", padx=10)
 
-    page_label = tb.Label(pagination_frame, text="")
     page_label.pack(side="left")
 
     tb.Button(
@@ -81,9 +91,9 @@ def show_ho_so_window(root, container, show_primary_window, controller=None):
         command=lambda: show_primary_window(root, container),
     ).pack(pady=20)
 
-    search_after_id = {"id": None}
+    search_after_id: dict[str, Optional[str]] = {"id": None}
 
-    def on_search_change(*args):
+    def on_search_change(*args: Any) -> None:
         controller.current_page = 1
         current_search_query["value"] = search_entry.get().strip()
 
@@ -102,7 +112,7 @@ def show_ho_so_window(root, container, show_primary_window, controller=None):
             ),
         )
 
-    def on_suggestion_selected(*args):
+    def on_suggestion_selected(*args: Any) -> None:
         if search_after_id["id"]:
             search_entry.after_cancel(search_after_id["id"])
             search_after_id["id"] = None
@@ -124,7 +134,14 @@ def show_ho_so_window(root, container, show_primary_window, controller=None):
     render_record_list(root, record_frame, page_label, show_primary_window, controller)
 
 
-def render_record_list(root, container, page_label, show_primary_window, controller, search_query=None):
+def render_record_list(
+    root: tb.Window,
+    container: tb.Frame,
+    page_label: tb.Label,
+    show_primary_window: Callable[..., None],
+    controller: RecordController,
+    search_query: Optional[str] = None,
+) -> None:
     record_list = controller.get_page(controller.current_page, ITEMS_PER_PAGE, search_query)
 
     for w in container.winfo_children():
@@ -200,7 +217,15 @@ def render_record_list(root, container, page_label, show_primary_window, control
     page_label.config(text=f"Page {controller.current_page} / {max_page}")
 
 
-def delete_ho_so(root, container, show_primary_window, controller, page_label, hoso_id, search_query=None):
+def delete_ho_so(
+    root: tb.Window,
+    container: tb.Frame,
+    show_primary_window: Callable[..., None],
+    controller: RecordController,
+    page_label: tb.Label,
+    hoso_id: int,
+    search_query: Optional[str] = None,
+) -> None:
     if not messagebox.askyesno("Xác nhận", "Bạn có chắc chắn muốn xoá hồ sơ này?"):
         return
 
@@ -213,7 +238,15 @@ def delete_ho_so(root, container, show_primary_window, controller, page_label, h
     render_record_list(root, container, page_label, show_primary_window, controller, search_query)
 
 
-def change_page(controller, direction, container, page_label, root, show_primary_window, search_query=None):
+def change_page(
+    controller: RecordController,
+    direction: int,
+    container: tb.Frame,
+    page_label: tb.Label,
+    root: tb.Window,
+    show_primary_window: Callable[..., None],
+    search_query: Optional[str] = None,
+) -> None:
     max_page = max(1, (controller.total_records + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
     controller.current_page = max(1, min(max_page, controller.current_page + direction))
     render_record_list(root, container, page_label, show_primary_window, controller, search_query)

@@ -1,14 +1,19 @@
+from __future__ import annotations
+
 from datetime import datetime
-from sqlalchemy.orm import selectinload, joinedload
+from typing import Any, Optional, Union
+
+from sqlalchemy.orm import Session, selectinload, joinedload
 
 from db.models import DonThuoc, ChiDinh, Thuoc, HoSo
 from db.session import get_session
 from utils.formatter import safe_float
 
 
+RowData = Union[dict[str, Any], list[Any]]
 
 
-def calculate_total_from_donthuoc(donthuoc_obj):
+def calculate_total_from_donthuoc(donthuoc_obj: Optional[DonThuoc]) -> float:
     if not donthuoc_obj:
         return 0.0
 
@@ -31,23 +36,22 @@ def calculate_total_from_donthuoc(donthuoc_obj):
     return total
 
 
-def fetch_prescription_summaries_by_hoso(hoso_id):
+def fetch_prescription_summaries_by_hoso(
+    hoso_id: int,
+) -> list[tuple[int, Optional[datetime]]]:
     session = get_session()
     try:
         return (
-            session.query(
-                DonThuoc.DonThuocID,
-                DonThuoc.NgayLap
-            )
+            session.query(DonThuoc.DonThuocID, DonThuoc.NgayLap)
             .filter(DonThuoc.HoSoID == hoso_id)
             .order_by(DonThuoc.NgayLap)
             .all()
         )
     finally:
-            session.close()
+        session.close()
 
 
-def fetch_prescription_detail_by_id(prescription_id):
+def fetch_prescription_detail_by_id(prescription_id: int) -> Optional[DonThuoc]:
     session = get_session()
     try:
         return (
@@ -62,7 +66,8 @@ def fetch_prescription_detail_by_id(prescription_id):
     finally:
         session.close()
 
-def fetch_prescriptions_by_hoso(hoso_id):
+
+def fetch_prescriptions_by_hoso(hoso_id: int) -> list[DonThuoc]:
     session = get_session()
     try:
         prescriptions = (
@@ -77,7 +82,7 @@ def fetch_prescriptions_by_hoso(hoso_id):
         session.close()
 
 
-def delete_prescription_by_id(donthuoc_id):
+def delete_prescription_by_id(donthuoc_id: int) -> None:
     session = get_session()
     try:
         don = session.get(DonThuoc, donthuoc_id)
@@ -89,40 +94,37 @@ def delete_prescription_by_id(donthuoc_id):
     finally:
         session.close()
 
-def normalize_cells(row):
-    # dict row from new UI
+
+def normalize_cells(row: RowData) -> list[str]:
     if isinstance(row, dict):
         row = row.get("entries", row)
 
-    # list of Entry widgets
     if row and hasattr(row[0], "get"):
         return [e.get().strip() for e in row]
 
-    # already list of strings
     return [str(v).strip() for v in row]
 
 
-def is_row_excluded(row):
+def is_row_excluded(row: RowData) -> bool:
     if isinstance(row, dict):
         return row.get("days", 1) <= 0
     return False
 
 
-def get_row_days(row):
+def get_row_days(row: RowData) -> int:
     if isinstance(row, dict):
         return row.get("days", 1)
     return 1
 
 
 def save_prescription(
-    hoso_id,
-    donthuoc_obj,
-    chandoan_text,
-    entry_rows,
-):
+    hoso_id: int,
+    donthuoc_obj: Optional[DonThuoc],
+    chandoan_text: str,
+    entry_rows: list[RowData],
+) -> tuple[DonThuoc, float]:
     session = get_session()
     try:
-        # 1️⃣ Create or merge DonThuoc
         if donthuoc_obj is None:
             donthuoc_obj = DonThuoc(HoSoID=hoso_id)
 
@@ -133,16 +135,14 @@ def save_prescription(
         donthuoc_obj.MoTa = chandoan_text
 
         donthuoc_obj = session.merge(donthuoc_obj)
-        session.flush()  # ensure DonThuocID exists (no commit yet)
+        session.flush()
 
-        # 2️⃣ Delete old ChiDinh (bulk delete, cleaner)
         session.query(ChiDinh)\
             .filter(ChiDinh.DonThuocID == donthuoc_obj.DonThuocID)\
             .delete()
 
-        # 3️⃣ Collect valid rows + medicine names
-        valid_rows = []
-        medicine_names = []
+        valid_rows: list[list[str]] = []
+        medicine_names: list[str] = []
 
         for row in entry_rows:
             values = normalize_cells(row)
@@ -153,18 +153,16 @@ def save_prescription(
             valid_rows.append(values)
             medicine_names.append(name)
 
-        # 4️⃣ Bulk load all medicines at once (fix N+1)
         thuoc_list = (
             session.query(Thuoc)
             .filter(Thuoc.Ten.in_(medicine_names))
             .all()
         )
 
-        thuoc_map = {t.Ten: t for t in thuoc_list}
+        thuoc_map: dict[str, Thuoc] = {t.Ten: t for t in thuoc_list}
 
         total_cost = 0.0
 
-        # 5️⃣ Create ChiDinh rows
         for row in entry_rows:
             values = normalize_cells(row)
             if not any(values):
@@ -197,11 +195,9 @@ def save_prescription(
 
             session.add(chi)
 
-        # 6️⃣ Update total and commit once
         donthuoc_obj.TienToa = total_cost
         session.commit()
 
-        # 7️⃣ Reload with relationships for UI
         donthuoc_obj = session.get(
             DonThuoc,
             donthuoc_obj.DonThuocID,
@@ -217,22 +213,29 @@ def save_prescription(
         session.close()
 
 
-_medicine_names_cache = {"names": None}
+_medicine_names_cache: dict[str, Optional[list[str]]] = {"names": None}
 
-def fetch_thuoc_suggestions(prefix: str):
+
+def fetch_thuoc_suggestions(prefix: str) -> list[str]:
     if not prefix:
         return []
     if _medicine_names_cache["names"] is None:
         session = get_session()
         try:
-            _medicine_names_cache["names"] = [t.Ten for t in session.query(Thuoc.Ten).order_by(Thuoc.Ten).all()]
+            _medicine_names_cache["names"] = [
+                t.Ten for t in session.query(Thuoc.Ten).order_by(Thuoc.Ten).all()
+            ]
         finally:
             session.close()
     prefix_lower = prefix.lower()
-    return [name for name in _medicine_names_cache["names"] if name.lower().startswith(prefix_lower)][:20]
+    return [
+        name
+        for name in _medicine_names_cache["names"]
+        if name.lower().startswith(prefix_lower)
+    ][:20]
 
 
-def fetch_thuoc_price_map(names):
+def fetch_thuoc_price_map(names: list[str]) -> dict[str, float]:
     names = [name for name in names if name]
     if not names:
         return {}
@@ -245,9 +248,10 @@ def fetch_thuoc_price_map(names):
         session.close()
 
 
-_price_cache = {"map": None}
+_price_cache: dict[str, Optional[dict[str, float]]] = {"map": None}
 
-def get_thuoc_price_map(names):
+
+def get_thuoc_price_map(names: list[str]) -> dict[str, float]:
     if _price_cache["map"] is None:
         session = get_session()
         try:
@@ -258,6 +262,6 @@ def get_thuoc_price_map(names):
     return {n: _price_cache["map"].get(n, 0.0) for n in names if n}
 
 
-def invalidate_price_cache():
+def invalidate_price_cache() -> None:
     _price_cache["map"] = None
     _medicine_names_cache["names"] = None

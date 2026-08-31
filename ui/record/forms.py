@@ -1,10 +1,22 @@
+from __future__ import annotations
+
+from typing import Any, Callable, Optional
+
 import ttkbootstrap as tb
 from tkinter import messagebox
 
 from services.record_service import create_record, update_record
 
 
-def show_edit_ho_so_window(root, container, show_primary_window, controller, hoso_id, record, show_ho_so_window):
+def show_edit_ho_so_window(
+    root: tb.Window,
+    container: tb.Frame,
+    show_primary_window: Callable[..., None],
+    controller: Any,
+    hoso_id: int,
+    record: Any,
+    show_ho_so_window: Callable[..., None],
+) -> None:
     _, name, year, address, phone, tiencan, _ = record
 
     for w in container.winfo_children():
@@ -37,7 +49,7 @@ def show_edit_ho_so_window(root, container, show_primary_window, controller, hos
     tiencan_entry.insert("1.0", tiencan)
     tiencan_entry.pack(fill="x", padx=10, pady=5)
 
-    def save_changes():
+    def save_changes() -> None:
         year_value = year_entry.get().strip()
         if year_value and not year_value.isdigit():
             messagebox.showerror("Lỗi", "Năm sinh chỉ được nhập số.")
@@ -63,7 +75,13 @@ def show_edit_ho_so_window(root, container, show_primary_window, controller, hos
     ).pack()
 
 
-def show_add_ho_so_window(root, page_container, controller, show_primary_window, show_ho_so_window):
+def show_add_ho_so_window(
+    root: tb.Window,
+    page_container: tb.Frame,
+    controller: Any,
+    show_primary_window: Callable[..., None],
+    show_ho_so_window: Callable[..., None],
+) -> None:
     for w in page_container.winfo_children():
         w.destroy()
 
@@ -90,7 +108,7 @@ def show_add_ho_so_window(root, page_container, controller, show_primary_window,
     tiencan_entry = tb.Text(form, width=40, height=5)
     tiencan_entry.pack(pady=5)
 
-    def add_ho_so():
+    def add_ho_so() -> None:
         name = name_entry.get().strip()
         year = year_entry.get().strip()
         address = address_entry.get().strip()

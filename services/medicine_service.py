@@ -1,11 +1,13 @@
-import unicodedata
+from __future__ import annotations
+
+from typing import Optional
 
 from db.models import Thuoc
 from db.session import get_session
 from services.prescription_service import invalidate_price_cache
 
 
-VI_BASE_ORDER = {
+VI_BASE_ORDER: dict[str, str] = {
     "ă": "a1",
     "â": "a2",
     "đ": "dz",
@@ -16,17 +18,19 @@ VI_BASE_ORDER = {
 }
 
 
-def remove_tone_marks(text):
+def remove_tone_marks(text: str) -> str:
+    import unicodedata
+
     normalized = unicodedata.normalize("NFD", text)
     return "".join(c for c in normalized if unicodedata.category(c) != "Mn")
 
 
-def vietnamese_sort_key(text):
+def vietnamese_sort_key(text: str) -> str:
     text = remove_tone_marks(text.lower())
     return "".join(VI_BASE_ORDER.get(char, char) for char in text)
 
 
-def fetch_medicines():
+def fetch_medicines() -> list[tuple[str, float]]:
     session = get_session()
     try:
         rows = session.query(Thuoc.Ten, Thuoc.Gia).all()
@@ -36,7 +40,7 @@ def fetch_medicines():
         session.close()
 
 
-def add_medicine(name, price):
+def add_medicine(name: str, price: int) -> None:
     session = get_session()
     try:
         session.add(Thuoc(Ten=name, Gia=int(price)))
@@ -46,7 +50,7 @@ def add_medicine(name, price):
         session.close()
 
 
-def update_medicine(old_name, new_name, new_price):
+def update_medicine(old_name: str, new_name: str, new_price: int) -> None:
     session = get_session()
     try:
         medicine = session.query(Thuoc).filter_by(Ten=old_name).first()
@@ -59,7 +63,7 @@ def update_medicine(old_name, new_name, new_price):
         session.close()
 
 
-def delete_medicine_by_name(name):
+def delete_medicine_by_name(name: str) -> None:
     session = get_session()
     try:
         medicine = session.query(Thuoc).filter_by(Ten=name).first()

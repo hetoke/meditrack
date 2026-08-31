@@ -1,16 +1,26 @@
+from __future__ import annotations
+
+from typing import Any, Callable, Optional
+
 import tkinter as tk
 
+
 class AutocompleteEntry(tk.Entry):
-    def __init__(self, master=None, fetch_suggestions=None, **kwargs):
+    def __init__(
+        self,
+        master: Optional[tk.Misc] = None,
+        fetch_suggestions: Optional[Callable[[str], list[str]]] = None,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(master, **kwargs)
         self.fetch_suggestions = fetch_suggestions
         self.var = tk.StringVar()
         self.config(textvariable=self.var)
         self.var.trace_add("write", self.on_change)
-        self.listbox = None
-        self.listbox_visible = False
-        self._suppress = False
-        self._debounce_id = None
+        self.listbox: Optional[tk.Listbox] = None
+        self.listbox_visible: bool = False
+        self._suppress: bool = False
+        self._debounce_id: Optional[str] = None
 
         self.bind("<Escape>", lambda e: self.destroy_listbox())
         self.winfo_toplevel().bind("<Button-1>", self._click_outside, add="+")
@@ -18,38 +28,39 @@ class AutocompleteEntry(tk.Entry):
         self.bind("<Destroy>", self._cleanup)
         self.bind("<Return>", self._on_entry_return)
 
-    def _cleanup(self, event=None):
+    def _cleanup(self, event: Optional[tk.Event] = None) -> None:
         self.destroy_listbox()
         try:
             self.winfo_toplevel().unbind("<Button-1>")
         except Exception:
             pass
 
-    def _click_outside(self, event):
+    def _click_outside(self, event: tk.Event) -> None:
         if self.listbox and event.widget not in (self, self.listbox):
             self.destroy_listbox()
 
-    def _on_entry_return(self, event):
+    def _on_entry_return(self, event: tk.Event) -> Optional[str]:
         if self.listbox:
             self._suppress = True
             self.destroy_listbox()
             self._suppress = False
             return "break"
+        return None
 
-    def destroy_listbox(self):
+    def destroy_listbox(self) -> None:
         if self.listbox:
             self.listbox.destroy()
             self.listbox = None
             self.listbox_visible = False
 
-    def on_change(self, *args):
+    def on_change(self, *args: Any) -> None:
         if self._suppress:
             return
         if self._debounce_id:
             self.after_cancel(self._debounce_id)
         self._debounce_id = self.after(150, self._do_fetch)
 
-    def _do_fetch(self):
+    def _do_fetch(self) -> None:
         self._debounce_id = None
         self.destroy_listbox()
         value = self.var.get().strip()
@@ -66,7 +77,7 @@ class AutocompleteEntry(tk.Entry):
         if len(suggestions) == 1 and suggestions[0].lower() == value.lower():
             return
 
-        self.listbox = tk.Listbox(self.winfo_toplevel(), height=min(5, len(suggestions)))
+        self.listbox = tk.Listbox(self.winfo_toplevel(), height=min(5, len(suggestions)), bg="white", fg="black", highlightthickness=0)
         self.listbox_visible = True
 
         for m in suggestions:
@@ -81,7 +92,7 @@ class AutocompleteEntry(tk.Entry):
         y = self.winfo_rooty() - self.winfo_toplevel().winfo_rooty() + self.winfo_height()
         self.listbox.place(x=x, y=y, width=self.winfo_width())
 
-    def select_suggestion(self, event=None):
+    def select_suggestion(self, event: Optional[tk.Event] = None) -> Optional[str]:
         if self.listbox:
             index = self.listbox.curselection()
             index = index[0] if index else self.listbox.index("active")
@@ -95,10 +106,12 @@ class AutocompleteEntry(tk.Entry):
             return "break"
         self.destroy_listbox()
         self.focus_set()
+        return None
 
-    def move_down(self, event):
+    def move_down(self, event: tk.Event) -> Optional[str]:
         if self.listbox:
             self.listbox.focus()
             self.listbox.selection_set(0)
             self.listbox.activate(0)
             return "break"
+        return None

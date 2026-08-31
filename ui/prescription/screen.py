@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Any, Callable, Optional
+
 import ttkbootstrap as tb
 import tkinter as tk
 from tkinter import messagebox
@@ -14,10 +18,10 @@ from utils.formatter import format_currency, format_ngaylap
 from utils.tk_helpers import clear_parents
 
 
-def collect_prescription_rows(entries):
-    rows = []
+def collect_prescription_rows(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
     for row in entries:
-        values = []
+        values: list[str] = []
         for entry in row["entries"]:
             if hasattr(entry, "get"):
                 values.append(entry.get().strip())
@@ -32,20 +36,23 @@ def collect_prescription_rows(entries):
     return rows
 
 
-def append_to_newest_prescription(prescriptions, current_index):
+def append_to_newest_prescription(
+    prescriptions: list[Optional[PrescriptionTable]],
+    current_index: dict[str, int],
+) -> None:
     if not prescriptions:
         return
 
     current_prescription = prescriptions[current_index["value"]]
     newest_prescription = prescriptions[-1]
 
-    existing_meds = set()
+    existing_meds: set[str] = set()
     for row in newest_prescription.entries:
         med_name = row["entries"][0].get().strip()
         if med_name:
             existing_meds.add(med_name)
 
-    rows_to_add = []
+    rows_to_add: list[dict[str, Any]] = []
     for row in current_prescription.entries:
         med_name = row["entries"][0].get().strip()
         if med_name and med_name not in existing_meds:
@@ -74,7 +81,13 @@ def append_to_newest_prescription(prescriptions, current_index):
     messagebox.showinfo("Thông báo", f"Đã thêm {len(rows_to_add)} thuốc vào đơn mới nhất.")
 
 
-def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_primary_window):
+def show_ho_so_detail_window(
+    root: tb.Window,
+    container: tb.Frame,
+    record: Any,
+    show_ho_so_window: Callable[..., None],
+    show_primary_window: Callable[..., None],
+) -> None:
     container = clear_parents(container, stop_at=root, levels=2)
 
     hoso_id, name, year, address, phone, tiencan, _ = record
@@ -105,16 +118,16 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
     tiencan_box = tb.Labelframe(sidebar, text="Tiền căn", padding=10)
     tiencan_box.pack(fill="x", pady=(2, 4), expand=False)
 
-    tiencan_text = tk.Text(tiencan_box, height=3, width=28, wrap="word")
+    tiencan_text = tk.Text(tiencan_box, height=3, width=28, wrap="word", bg="white", fg="black")
     tiencan_text.pack(fill="x")
     if tiencan:
         tiencan_text.insert("1.0", tiencan)
     tiencan_text.config(state="disabled")
 
-    current_index = {"value": 0}
+    current_index: dict[str, int] = {"value": 0}
     summary_rows = fetch_prescription_summaries_by_hoso(hoso_id)
     prescription_ids = [row.DonThuocID for row in summary_rows]
-    prescriptions = [None] * len(prescription_ids)
+    prescriptions: list[Optional[PrescriptionTable]] = [None] * len(prescription_ids)
 
     sidebar_nav = tb.Frame(sidebar)
     sidebar_nav.pack(fill="x", pady=(10, 5))
@@ -134,9 +147,9 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
     date_label = tb.Label(sidebar_nav, text="")
     date_label.pack(fill="x", pady=2)
 
-    _total_after_id = {"id": None}
+    _total_after_id: dict[str, Optional[str]] = {"id": None}
 
-    def update_sidebar_total(table):
+    def update_sidebar_total(table: Optional[PrescriptionTable]) -> None:
         if _total_after_id["id"]:
             root.after_cancel(_total_after_id["id"])
             _total_after_id["id"] = None
@@ -145,7 +158,7 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
             sidebar_total_label.config(text=f"T: {format_currency(0)}")
             return
 
-        def _do_update():
+        def _do_update() -> None:
             _total_after_id["id"] = None
             medicine_names = [row["entries"][0].get().strip() for row in table.entries]
             total_value = table.get_total(get_thuoc_price_map(medicine_names))
@@ -153,7 +166,7 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
 
         _total_after_id["id"] = root.after(200, _do_update)
 
-    def show_prescription(index):
+    def show_prescription(index: int) -> None:
         for table in prescriptions:
             if table:
                 table.pack_forget()
@@ -179,21 +192,21 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
         prev_btn.config(state=("disabled" if index == 0 else "normal"))
         next_btn.config(state=("disabled" if index == len(prescriptions) - 1 else "normal"))
 
-    def next_prescription():
+    def next_prescription() -> None:
         if current_index["value"] < len(prescriptions) - 1:
             show_prescription(current_index["value"] + 1)
 
-    def prev_prescription():
+    def prev_prescription() -> None:
         if current_index["value"] > 0:
             show_prescription(current_index["value"] - 1)
 
-    def add_prescription():
+    def add_prescription() -> None:
         table = PrescriptionTable(content)
         table.on_change = lambda: update_sidebar_total(table)
         prescriptions.append(table)
         show_prescription(len(prescriptions) - 1)
 
-    def duplicate_prescription():
+    def duplicate_prescription() -> None:
         if not prescriptions:
             return
 
@@ -207,7 +220,7 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
         prescriptions.append(table)
         show_prescription(len(prescriptions) - 1)
 
-    def delete_prescription(index):
+    def delete_prescription(index: int) -> None:
         table = prescriptions[index]
 
         if table.dirty and not messagebox.askyesno("Chưa lưu", "Đơn thuốc này có thay đổi chưa lưu. Xoá vẫn tiếp tục?"):
@@ -227,7 +240,7 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
             prescriptions.append(new_table)
             show_prescription(0)
 
-    def save_current_prescription():
+    def save_current_prescription() -> None:
         if not prescriptions:
             return
 
@@ -280,7 +293,7 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
         command=lambda: delete_prescription(current_index["value"]),
     ).pack(fill="x", pady=2)
 
-    def confirm_back():
+    def confirm_back() -> None:
         if prescriptions:
             current_prescription = prescriptions[current_index["value"]]
             if current_prescription.dirty and not messagebox.askyesno(

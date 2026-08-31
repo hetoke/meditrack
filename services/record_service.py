@@ -1,18 +1,22 @@
-# services/record_service.py
+from __future__ import annotations
+
 from datetime import date, datetime
-import unicodedata
 import re
+from typing import Optional
 
 from sqlalchemy import func, or_, case
+from sqlalchemy.orm import Query
 from db.models import HoSo, DonThuoc
 from db.session import get_session
 
+Record = tuple[int, str, Optional[int], Optional[str], Optional[str], Optional[str], Optional[datetime]]
 
-# -------------------------
-# Fetch
-# -------------------------
 
-def _apply_search_filters(query, search_query: str, exact_given_name=False):
+def _apply_search_filters(
+    query: Query,
+    search_query: str,
+    exact_given_name: bool = False,
+) -> Query:
     name_query, year_query = parse_search_query(search_query)
     if name_query:
         pattern = f"%{name_query}%"
@@ -27,7 +31,7 @@ def _apply_search_filters(query, search_query: str, exact_given_name=False):
                 (HoSo.GivenName == name_query.lower(), 1),
                 (HoSo.GivenName.ilike(pattern), 2),
                 (HoSo.Ten.ilike(pattern), 3),
-                else_=4
+                else_=4,
             )
         )
     if year_query is not None:
@@ -35,14 +39,19 @@ def _apply_search_filters(query, search_query: str, exact_given_name=False):
     return query
 
 
-def fetch_records_page(page, page_size, search_query=None, count=True):
+def fetch_records_page(
+    page: int,
+    page_size: int,
+    search_query: Optional[str] = None,
+    count: bool = True,
+) -> tuple[list[Record], Optional[int]]:
     session = get_session()
     try:
         query = session.query(HoSo)
         if search_query:
             query = _apply_search_filters(query, search_query)
-        
-        total = query.count() if count else None
+
+        total: Optional[int] = query.count() if count else None
         rows = (
             query
             .order_by(HoSo.NgayMoHoSo.desc())
@@ -50,14 +59,16 @@ def fetch_records_page(page, page_size, search_query=None, count=True):
             .offset((page - 1) * page_size)
             .all()
         )
-        result = [(r.HoSoID, r.Ten, r.NamSinh, r.DiaChi,
-                   r.DienThoai, r.TienCan, r.NgayMoHoSo) for r in rows]
+        result: list[Record] = [
+            (r.HoSoID, r.Ten, r.NamSinh, r.DiaChi, r.DienThoai, r.TienCan, r.NgayMoHoSo)
+            for r in rows
+        ]
         return result, total
     finally:
         session.close()
 
 
-def fetch_patient_suggestions(query: str):
+def fetch_patient_suggestions(query: str) -> list[str]:
     session = get_session()
     try:
         q = _apply_search_filters(session.query(HoSo), query)
@@ -66,10 +77,14 @@ def fetch_patient_suggestions(query: str):
     finally:
         session.close()
 
-# -------------------------
-# Create
-# -------------------------
-def create_record(name, year, address, phone, tiencan):
+
+def create_record(
+    name: str,
+    year: str,
+    address: str,
+    phone: str,
+    tiencan: str,
+) -> None:
     session = get_session()
     hoso = HoSo(
         Ten=name,
@@ -85,10 +100,14 @@ def create_record(name, year, address, phone, tiencan):
     session.close()
 
 
-# -------------------------
-# Update
-# -------------------------
-def update_record(hoso_id, name, year, address, phone, tiencan):
+def update_record(
+    hoso_id: int,
+    name: str,
+    year: str,
+    address: str,
+    phone: str,
+    tiencan: str,
+) -> None:
     session = get_session()
     h = session.get(HoSo, hoso_id)
     if h:
@@ -101,10 +120,7 @@ def update_record(hoso_id, name, year, address, phone, tiencan):
     session.close()
 
 
-# -------------------------
-# Delete
-# -------------------------
-def delete_record(hoso_id):
+def delete_record(hoso_id: int) -> None:
     session = get_session()
     h = session.get(HoSo, hoso_id)
     if h:
@@ -113,25 +129,15 @@ def delete_record(hoso_id):
     session.close()
 
 
-# -------------------------
-# Search helpers
-# -------------------------
-
-
-
-def parse_search_query(query: str):
+def parse_search_query(query: str) -> tuple[Optional[str], Optional[int]]:
     query_norm = query.strip()
     if not query_norm:
         return None, None
 
     nums = re.findall(r"\d+", query_norm)
-    year = int(nums[0]) if nums else None
+    year: Optional[int] = int(nums[0]) if nums else None
 
     letters = re.findall(r"[^\W\d_]+", query_norm, re.UNICODE)
-    name = " ".join(letters).strip() or None
+    name: Optional[str] = " ".join(letters).strip() or None
 
     return name, year
-
-
-
-

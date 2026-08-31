@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Any, Callable, Optional
+
 import ttkbootstrap as tb
 
 from intellisense import AutocompleteEntry
@@ -10,18 +14,24 @@ from services.medicine_service import (
 from utils.tk_helpers import clear_parents
 
 
-ITEMS_PER_PAGE = 8
-current_page = {"value": 1}
-medicines = fetch_medicines()
+ITEMS_PER_PAGE: int = 8
+current_page: dict[str, int] = {"value": 1}
+medicines: list[tuple[str, float]] = fetch_medicines()
 
 
-def _reload_medicines():
+def _reload_medicines() -> list[tuple[str, float]]:
     global medicines
     medicines = fetch_medicines()
     return medicines
 
 
-def render_medicine_list(root, page_container, page_label, show_primary_window, medicine_list=None):
+def render_medicine_list(
+    root: tb.Window,
+    page_container: tb.Frame,
+    page_label: tb.Label,
+    show_primary_window: Callable[..., None],
+    medicine_list: Optional[list[tuple[str, float]]] = None,
+) -> None:
     for w in page_container.winfo_children():
         w.destroy()
 
@@ -67,7 +77,14 @@ def render_medicine_list(root, page_container, page_label, show_primary_window, 
     page_label.config(text=f"Page {current_page['value']} / {max_page}")
 
 
-def change_page(direction, page_container, page_label, root, show_primary_window, medicine_list=None):
+def change_page(
+    direction: int,
+    page_container: tb.Frame,
+    page_label: tb.Label,
+    root: tb.Window,
+    show_primary_window: Callable[..., None],
+    medicine_list: Optional[list[tuple[str, float]]] = None,
+) -> None:
     if medicine_list is None:
         medicine_list = medicines
     max_page = max(1, (len(medicine_list) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
@@ -75,7 +92,11 @@ def change_page(direction, page_container, page_label, root, show_primary_window
     render_medicine_list(root, page_container, page_label, show_primary_window, medicine_list=medicine_list)
 
 
-def show_thuoc_window(root, page_container, show_primary_window):
+def show_thuoc_window(
+    root: tb.Window,
+    page_container: tb.Frame,
+    show_primary_window: Callable[..., None],
+) -> None:
     page_container = clear_parents(page_container, stop_at=root, levels=2)
 
     tb.Label(page_container, text="💊 Quản lý thuốc", font=("Quicksand", 16, "bold")).pack(pady=10)
@@ -85,7 +106,7 @@ def show_thuoc_window(root, page_container, show_primary_window):
 
     tb.Label(search_frame, text="🔍").pack(side="left")
 
-    def fetch_suggestions(query):
+    def fetch_suggestions(query: str) -> list[str]:
         if not query:
             return []
 
@@ -100,9 +121,9 @@ def show_thuoc_window(root, page_container, show_primary_window):
         command=lambda: (search_entry.delete(0, "end"), on_search_change()),
     ).pack(side="left", padx=5)
 
-    filtered_medicines = {"data": medicines.copy()}
+    filtered_medicines: dict[str, list[tuple[str, float]]] = {"data": medicines.copy()}
 
-    def on_search_change(*args):
+    def on_search_change(*args: Any) -> None:
         query = search_entry.get().strip().lower()
         if query:
             filtered_medicines["data"] = [m for m in medicines if query in m[0].lower()]
@@ -168,7 +189,11 @@ def show_thuoc_window(root, page_container, show_primary_window):
     )
 
 
-def show_add_thuoc_window(root, page_container, show_primary_window):
+def show_add_thuoc_window(
+    root: tb.Window,
+    page_container: tb.Frame,
+    show_primary_window: Callable[..., None],
+) -> None:
     for w in page_container.winfo_children():
         w.destroy()
 
@@ -183,7 +208,7 @@ def show_add_thuoc_window(root, page_container, show_primary_window):
     price_entry = tb.Entry(form, width=40)
     price_entry.pack(pady=5)
 
-    def save_new_medicine():
+    def save_new_medicine() -> None:
         name = name_entry.get().strip()
         price = price_entry.get().strip()
 
@@ -203,7 +228,13 @@ def show_add_thuoc_window(root, page_container, show_primary_window):
     ).pack(pady=20)
 
 
-def show_edit_thuoc_window(root, page_container, show_primary_window, old_name, old_price):
+def show_edit_thuoc_window(
+    root: tb.Window,
+    page_container: tb.Frame,
+    show_primary_window: Callable[..., None],
+    old_name: str,
+    old_price: float,
+) -> None:
     for w in page_container.winfo_children():
         w.destroy()
 
@@ -220,7 +251,7 @@ def show_edit_thuoc_window(root, page_container, show_primary_window, old_name, 
     price_entry.insert(0, str(int(old_price)))
     price_entry.pack(pady=5)
 
-    def save_medicine_changes():
+    def save_medicine_changes() -> None:
         update_medicine(old_name, name_entry.get().strip(), price_entry.get().strip())
         _reload_medicines()
         current_page["value"] = 1
@@ -238,7 +269,13 @@ def show_edit_thuoc_window(root, page_container, show_primary_window, old_name, 
     ).pack(side="left", padx=10)
 
 
-def delete_medicine(root, page_container, show_primary_window, page_label, name):
+def delete_medicine(
+    root: tb.Window,
+    page_container: tb.Frame,
+    show_primary_window: Callable[..., None],
+    page_label: tb.Label,
+    name: str,
+) -> None:
     delete_medicine_by_name(name)
     _reload_medicines()
     current_page["value"] = 1

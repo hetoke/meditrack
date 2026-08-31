@@ -197,7 +197,7 @@ class PrescriptionTable:
         box = tb.Labelframe(self.frame, text="Chuẩn đoán", padding=10)
         box.pack(fill="x", pady=(2, 4))
 
-        self.chandoan_text = tk.Text(box, height=3, wrap="word")
+        self.chandoan_text = tk.Text(box, height=3, wrap="word", bg="white", fg="black")
         self.chandoan_text.pack(fill="x")
 
         if self.donthuoc and getattr(self.donthuoc, "MoTa", None):
@@ -221,14 +221,14 @@ class PrescriptionTable:
         table_outer = tb.Frame(self.frame)
         table_outer.pack(fill="both", expand=True, padx=20, pady=(2, 6))
 
-        canvas = tk.Canvas(table_outer)
+        canvas = tk.Canvas(table_outer, bg="white", highlightthickness=0)
         vsb = tb.Scrollbar(table_outer, orient="vertical", command=canvas.yview)
         canvas.configure(yscrollcommand=vsb.set)
 
         vsb.pack(side="right", fill="y")
         canvas.pack(side="left", fill="both", expand=True)
 
-        self.grid_frame = tb.Frame(canvas)
+        self.grid_frame = tk.Frame(canvas, bg="white")
         window_id = canvas.create_window((0, 0), window=self.grid_frame, anchor="nw")
 
         for c in range(len(self.columns)):
@@ -344,9 +344,10 @@ class PrescriptionTable:
         def read_row_days(row_obj):
             try:
                 val = int(row_obj["entry_days"].get().strip())
-                row_obj["days"] = max(0, val)
+                row_obj["days"] = max(0, min(99, val))
             except (ValueError, TypeError):
                 row_obj["days"] = 1
+            update_row_days(row_obj)
 
         def fill_all_days(source_row):
             read_row_days(source_row)
@@ -381,12 +382,20 @@ class PrescriptionTable:
                 "<FocusOut>",
                 lambda _event, ro=row_obj: (read_row_days(ro), self._mark_dirty()),
             )
-            def on_space(event):
+            def on_days_key(event):
                 if event.keysym == "space":
                     fill_all_days(row_obj)
                     return "break"
+                # Allow control keys
+                if event.keysym in ("BackSpace", "Delete", "Left", "Right", "Home", "End", "Tab"):
+                    return None
+                # Allow digits only, max 2 chars
+                current = row_obj["entry_days"].get().strip()
+                if event.char and event.char.isdigit() and len(current) < 2:
+                    return None
+                return "break"
 
-            row_obj["entry_days"].bind("<Key>", on_space)
+            row_obj["entry_days"].bind("<Key>", on_days_key)
 
             # Setup entry events
             for c, entry in enumerate(row_obj["entries"]):
