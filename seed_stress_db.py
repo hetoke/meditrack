@@ -94,7 +94,8 @@ def seed_data(session, medicines):
                 thuoc_id, price = random.choice(medicines)
 
                 doses = [random.randint(0, 2) for _ in range(7)]
-                total_cost += sum(doses) * float(price)
+                so_ngay = random.randint(1, 7)
+                total_cost += sum(doses) * float(price) * so_ngay
 
                 chi_batch.append(
                     ChiDinh(
@@ -107,6 +108,7 @@ def seed_data(session, medicines):
                         ChieuTruocAn=doses[4],
                         ChieuSauAn=doses[5],
                         Toi=doses[6],
+                        SoNgay=so_ngay,
                     )
                 )
 

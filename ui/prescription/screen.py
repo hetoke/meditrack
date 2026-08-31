@@ -27,7 +27,7 @@ def collect_prescription_rows(entries):
         if any(values):
             rows.append({
                 "entries": values,
-                "excluded": row.get("exclude_from_total", False),
+                "days": row.get("days", 1),
             })
     return rows
 
@@ -51,7 +51,7 @@ def append_to_newest_prescription(prescriptions, current_index):
         if med_name and med_name not in existing_meds:
             rows_to_add.append({
                 "entries": [e.get().strip() for e in row["entries"]],
-                "excluded": row.get("exclude_from_total", False),
+                "days": row.get("days", 1),
             })
             existing_meds.add(med_name)
 

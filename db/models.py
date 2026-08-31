@@ -69,7 +69,7 @@ class ChiDinh(Base):
     ChieuTruocAn = Column(Float, default=0.0)
     ChieuSauAn = Column(Float, default=0.0)
     Toi = Column(Float, default=0.0)
-    KhongTinhTien = Column(Integer, default=0)
+    SoNgay = Column(Integer, default=1)
 
     donthuoc = relationship("DonThuoc", back_populates="chidinh_list")
     thuoc = relationship("Thuoc", back_populates="chidinh_list")

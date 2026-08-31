@@ -14,7 +14,8 @@ def calculate_total_from_donthuoc(donthuoc_obj):
 
     total = 0.0
     for chi in donthuoc_obj.chidinh_list:
-        if getattr(chi, "KhongTinhTien", 0):
+        days = getattr(chi, "SoNgay", 1)
+        if days <= 0:
             continue
         price = float(chi.thuoc.Gia or 0) if chi.thuoc else 0.0
         dose = (
@@ -26,7 +27,7 @@ def calculate_total_from_donthuoc(donthuoc_obj):
             + safe_float(chi.ChieuSauAn)
             + safe_float(chi.Toi)
         )
-        total += dose * price
+        total += dose * price * days
     return total
 
 
@@ -103,8 +104,14 @@ def normalize_cells(row):
 
 def is_row_excluded(row):
     if isinstance(row, dict):
-        return bool(row.get("excluded", False))
+        return row.get("days", 1) <= 0
     return False
+
+
+def get_row_days(row):
+    if isinstance(row, dict):
+        return row.get("days", 1)
+    return 1
 
 
 def save_prescription(
@@ -171,10 +178,9 @@ def save_prescription(
 
             price = float(thuoc_obj.Gia or 0)
             doses = [safe_float(v) for v in values[1:8]]
-            excluded = is_row_excluded(row)
+            days = get_row_days(row)
 
-            if not excluded:
-                total_cost += sum(doses) * price
+            total_cost += sum(doses) * price * days
 
             chi = ChiDinh(
                 DonThuocID=donthuoc_obj.DonThuocID,
@@ -186,7 +192,7 @@ def save_prescription(
                 ChieuTruocAn=doses[4],
                 ChieuSauAn=doses[5],
                 Toi=doses[6],
-                KhongTinhTien=1 if excluded else 0,
+                SoNgay=days,
             )
 
             session.add(chi)

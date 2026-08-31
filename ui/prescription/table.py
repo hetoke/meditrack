@@ -31,9 +31,9 @@ class TableRowFactory:
 
     def create_row_structure(self, values=None):
         """Creates the basic structure of a row - returns entries and buttons"""
-        excluded = False
+        days = 1
         if isinstance(values, dict):
-            excluded = values.get("excluded", False)
+            days = values.get("days", 1)
             values = values.get("entries", [])
 
         values = values or [""] * len(self.columns)
@@ -58,9 +58,6 @@ class TableRowFactory:
             entry.config(
                 relief="solid",
                 bd=1,
-                highlightthickness=1,
-                highlightbackground="black",
-                highlightcolor="black",
             )
 
             if c < len(values):
@@ -94,10 +91,13 @@ class TableRowFactory:
             width=2,
         )
 
-        btn_toggle_money = tb.Button(
+        entry_days = tk.Entry(
             self.parent_frame,
-            text="T$",
             width=3,
+            font=self.bold_font,
+            justify="center",
+            relief="solid",
+            bd=1,
         )
 
         return {
@@ -105,8 +105,8 @@ class TableRowFactory:
             "btn_del": btn_del,
             "btn_insert_above": btn_insert_above,
             "btn_insert_below": btn_insert_below,
-            "btn_toggle_money": btn_toggle_money,
-            "exclude_from_total": excluded,
+            "entry_days": entry_days,
+            "days": days,
         }
 
     def setup_entry_events(self, entry, col, on_cell_motion, on_cell_press, on_cell_drag, on_cell_release):
@@ -315,13 +315,12 @@ class PrescriptionTable:
                 row["btn_del"].grid(row=i, column=base)
                 row["btn_insert_above"].grid(row=i, column=base + 1)
                 row["btn_insert_below"].grid(row=i, column=base + 2)
-                row["btn_toggle_money"].grid(row=i, column=base + 3, padx=(2, 0))
+                row["entry_days"].grid(row=i, column=base + 3, padx=(2, 0))
 
-        def update_row_money_button(row_obj):
-            if row_obj["exclude_from_total"]:
-                row_obj["btn_toggle_money"].config(text="No$", bootstyle="warning")
-            else:
-                row_obj["btn_toggle_money"].config(text="T$", bootstyle="success")
+        def update_row_days(row_obj):
+            entry = row_obj["entry_days"]
+            entry.delete(0, "end")
+            entry.insert(0, str(row_obj["days"]))
 
         def delete_row(row_obj):
             idx = get_row_index(row_obj)
@@ -329,7 +328,7 @@ class PrescriptionTable:
                 row_obj["btn_del"],
                 row_obj["btn_insert_above"],
                 row_obj["btn_insert_below"],
-                row_obj["btn_toggle_money"],
+                row_obj["entry_days"],
             ]:
                 w.destroy()
             self.entries.pop(idx)
@@ -342,10 +341,12 @@ class PrescriptionTable:
         def insert_row_below(index):
             add_row_at_index(index + 1)
 
-        def toggle_row_money(row_obj):
-            row_obj["exclude_from_total"] = not row_obj["exclude_from_total"]
-            update_row_money_button(row_obj)
-            self._mark_dirty()
+        def read_row_days(row_obj):
+            try:
+                val = int(row_obj["entry_days"].get().strip())
+                row_obj["days"] = max(0, val)
+            except (ValueError, TypeError):
+                row_obj["days"] = 1
 
         def normalize_numeric_entry(entry):
             value = entry.get().strip()
@@ -363,8 +364,13 @@ class PrescriptionTable:
             row_obj["btn_del"].config(command=lambda ro=row_obj: delete_row(ro))
             row_obj["btn_insert_above"].config(command=lambda ro=row_obj: insert_row_above(get_row_index(ro)))
             row_obj["btn_insert_below"].config(command=lambda ro=row_obj: insert_row_below(get_row_index(ro)))
-            row_obj["btn_toggle_money"].config(command=lambda ro=row_obj: toggle_row_money(ro))
-            update_row_money_button(row_obj)
+
+            # Setup days entry
+            update_row_days(row_obj)
+            row_obj["entry_days"].bind(
+                "<FocusOut>",
+                lambda _event, ro=row_obj: (read_row_days(ro), self._mark_dirty()),
+            )
 
             # Setup entry events
             for c, entry in enumerate(row_obj["entries"]):
@@ -408,7 +414,7 @@ class PrescriptionTable:
                         chi.ChieuSauAn or "",
                         chi.Toi or "",
                     ],
-                    "excluded": bool(getattr(chi, "KhongTinhTien", 0)),
+                    "days": getattr(chi, "SoNgay", 1),
                 })
         elif seed_rows:
             for row in seed_rows:
@@ -436,7 +442,8 @@ class PrescriptionTable:
     def get_total(self, price_lookup):
         total = 0.0
         for row in self.entries:
-            if row["exclude_from_total"]:
+            days = row.get("days", 1)
+            if days <= 0:
                 continue
 
             name = row["entries"][0].get().strip()
@@ -445,7 +452,7 @@ class PrescriptionTable:
 
             price = float(price_lookup.get(name, 0) or 0)
             doses = [safe_float(entry.get().strip()) for entry in row["entries"][1:]]
-            total += sum(doses) * price
+            total += sum(doses) * price * days
 
         return total
 
