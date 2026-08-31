@@ -1,9 +1,13 @@
+import sys
 from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if getattr(sys, "frozen", False):
+    PROJECT_ROOT = Path(sys.executable).parent
+else:
+    PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 def sqlite_url(filename: str) -> str:
@@ -16,6 +20,9 @@ PROD = sqlite_url("clinic_prod.db")
 
 # SQLite engine (change the connection string if needed)
 engine = create_engine(PROD, echo=False)
+
+from db.models import Base
+Base.metadata.create_all(engine)
 
 # Session factory
 SessionLocal = sessionmaker(bind=engine)

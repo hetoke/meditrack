@@ -2,6 +2,7 @@ import unicodedata
 
 from db.models import Thuoc
 from db.session import get_session
+from services.prescription_service import invalidate_price_cache
 
 
 VI_BASE_ORDER = {
@@ -28,9 +29,9 @@ def vietnamese_sort_key(text):
 def fetch_medicines():
     session = get_session()
     try:
-        medicines = session.query(Thuoc).all()
-        medicines_sorted = sorted(medicines, key=lambda t: vietnamese_sort_key(t.Ten))
-        return [(t.Ten, float(t.Gia)) for t in medicines_sorted]
+        rows = session.query(Thuoc.Ten, Thuoc.Gia).all()
+        medicines_sorted = sorted(rows, key=lambda t: vietnamese_sort_key(t[0]))
+        return [(t[0], float(t[1])) for t in medicines_sorted]
     finally:
         session.close()
 
@@ -40,6 +41,7 @@ def add_medicine(name, price):
     try:
         session.add(Thuoc(Ten=name, Gia=int(price)))
         session.commit()
+        invalidate_price_cache()
     finally:
         session.close()
 
@@ -52,6 +54,7 @@ def update_medicine(old_name, new_name, new_price):
             medicine.Ten = new_name
             medicine.Gia = int(new_price)
             session.commit()
+            invalidate_price_cache()
     finally:
         session.close()
 
@@ -63,5 +66,6 @@ def delete_medicine_by_name(name):
         if medicine:
             session.delete(medicine)
             session.commit()
+            invalidate_price_cache()
     finally:
         session.close()

@@ -46,7 +46,7 @@ class Thuoc(Base):
     __tablename__ = "thuoc"
 
     ThuocID = Column(Integer, primary_key=True, autoincrement=True)
-    Ten = Column(String, nullable=False)
+    Ten = Column(String, nullable=False, index=True)
     Gia = Column(DECIMAL)
 
     chidinh_list = relationship("ChiDinh", back_populates="thuoc")

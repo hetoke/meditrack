@@ -6,7 +6,7 @@ from services.prescription_service import (
     delete_prescription_by_id,
     fetch_prescription_detail_by_id,
     fetch_prescription_summaries_by_hoso,
-    fetch_thuoc_price_map,
+    get_thuoc_price_map,
     save_prescription,
 )
 from ui.prescription.table import PrescriptionTable
@@ -134,14 +134,24 @@ def show_ho_so_detail_window(root, container, record, show_ho_so_window, show_pr
     date_label = tb.Label(sidebar_nav, text="")
     date_label.pack(fill="x", pady=2)
 
+    _total_after_id = {"id": None}
+
     def update_sidebar_total(table):
+        if _total_after_id["id"]:
+            root.after_cancel(_total_after_id["id"])
+            _total_after_id["id"] = None
+
         if not table:
             sidebar_total_label.config(text=f"T: {format_currency(0)}")
             return
 
-        medicine_names = [row["entries"][0].get().strip() for row in table.entries]
-        total_value = table.get_total(fetch_thuoc_price_map(medicine_names))
-        sidebar_total_label.config(text=f"T: {format_currency(total_value)}")
+        def _do_update():
+            _total_after_id["id"] = None
+            medicine_names = [row["entries"][0].get().strip() for row in table.entries]
+            total_value = table.get_total(get_thuoc_price_map(medicine_names))
+            sidebar_total_label.config(text=f"T: {format_currency(total_value)}")
+
+        _total_after_id["id"] = root.after(200, _do_update)
 
     def show_prescription(index):
         for table in prescriptions:

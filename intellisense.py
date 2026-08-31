@@ -10,6 +10,7 @@ class AutocompleteEntry(tk.Entry):
         self.listbox = None
         self.listbox_visible = False
         self._suppress = False
+        self._debounce_id = None
 
         self.bind("<Escape>", lambda e: self.destroy_listbox())
         self.winfo_toplevel().bind("<Button-1>", self._click_outside, add="+")
@@ -44,8 +45,14 @@ class AutocompleteEntry(tk.Entry):
     def on_change(self, *args):
         if self._suppress:
             return
+        if self._debounce_id:
+            self.after_cancel(self._debounce_id)
+        self._debounce_id = self.after(150, self._do_fetch)
+
+    def _do_fetch(self):
+        self._debounce_id = None
         self.destroy_listbox()
-        value = self.var.get()
+        value = self.var.get().strip()
         if not value or not self.fetch_suggestions:
             return
 
@@ -54,6 +61,9 @@ class AutocompleteEntry(tk.Entry):
         except Exception:
             suggestions = []
         if not suggestions:
+            return
+
+        if len(suggestions) == 1 and suggestions[0].lower() == value.lower():
             return
 
         self.listbox = tk.Listbox(self.winfo_toplevel(), height=min(5, len(suggestions)))
@@ -66,6 +76,7 @@ class AutocompleteEntry(tk.Entry):
         self.listbox.bind("<Return>", self.select_suggestion)
         self.listbox.bind("<Escape>", lambda e: (self.destroy_listbox(), self.focus_set()))
 
+        self.update_idletasks()
         x = self.winfo_rootx() - self.winfo_toplevel().winfo_rootx()
         y = self.winfo_rooty() - self.winfo_toplevel().winfo_rooty() + self.winfo_height()
         self.listbox.place(x=x, y=y, width=self.winfo_width())

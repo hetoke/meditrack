@@ -82,8 +82,7 @@ def delete_prescription_by_id(donthuoc_id):
         don = session.get(DonThuoc, donthuoc_id)
         if not don:
             return
-        for chi in list(don.chidinh_list):
-            session.delete(chi)
+        session.query(ChiDinh).filter(ChiDinh.DonThuocID == donthuoc_id).delete()
         session.delete(don)
         session.commit()
     finally:
@@ -212,22 +211,19 @@ def save_prescription(
         session.close()
 
 
+_medicine_names_cache = {"names": None}
+
 def fetch_thuoc_suggestions(prefix: str):
     if not prefix:
         return []
-
-    session = get_session()
-    try:
-        return [
-            t.Ten
-            for t in session.query(Thuoc)
-            .filter(Thuoc.Ten.ilike(f"{prefix}%"))
-            .order_by(Thuoc.Ten)
-            .limit(20)
-            .all()
-        ]
-    finally:
-        session.close()
+    if _medicine_names_cache["names"] is None:
+        session = get_session()
+        try:
+            _medicine_names_cache["names"] = [t.Ten for t in session.query(Thuoc.Ten).order_by(Thuoc.Ten).all()]
+        finally:
+            session.close()
+    prefix_lower = prefix.lower()
+    return [name for name in _medicine_names_cache["names"] if name.lower().startswith(prefix_lower)][:20]
 
 
 def fetch_thuoc_price_map(names):
@@ -241,3 +237,21 @@ def fetch_thuoc_price_map(names):
         return {row.Ten: float(row.Gia or 0) for row in rows}
     finally:
         session.close()
+
+
+_price_cache = {"map": None}
+
+def get_thuoc_price_map(names):
+    if _price_cache["map"] is None:
+        session = get_session()
+        try:
+            rows = session.query(Thuoc.Ten, Thuoc.Gia).all()
+            _price_cache["map"] = {t: float(g or 0) for t, g in rows}
+        finally:
+            session.close()
+    return {n: _price_cache["map"].get(n, 0.0) for n in names if n}
+
+
+def invalidate_price_cache():
+    _price_cache["map"] = None
+    _medicine_names_cache["names"] = None

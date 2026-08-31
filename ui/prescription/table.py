@@ -64,7 +64,11 @@ class TableRowFactory:
             )
 
             if c < len(values):
+                if isinstance(entry, AutocompleteEntry):
+                    entry._suppress = True
                 entry.insert(0, format_dose_value(values[c]) if c > 0 else values[c])
+                if isinstance(entry, AutocompleteEntry):
+                    entry._suppress = False
 
             if c in self.sau_an_indices:
                 entry.config(bg="#FFC107")
@@ -349,6 +353,8 @@ class PrescriptionTable:
             entry.delete(0, "end")
             entry.insert(0, formatted)
 
+        self._batch_mode = False
+
         def add_row_at_index(index, values=None):
             # Use factory to create row structure
             row_obj = factory.create_row_structure(values)
@@ -378,17 +384,17 @@ class PrescriptionTable:
             # Insert at specific index
             self.entries.insert(index, row_obj)
 
-            refresh_grid()
-            canvas.update_idletasks()
-            canvas.configure(scrollregion=canvas.bbox("all"))
-            
-            # Focus on the first entry of the newly inserted row
-            self.entries[index]["entries"][0].focus_set()
+            if not self._batch_mode:
+                refresh_grid()
+                canvas.update_idletasks()
+                canvas.configure(scrollregion=canvas.bbox("all"))
+                self.entries[index]["entries"][0].focus_set()
 
         def add_row(values=None):
             add_row_at_index(len(self.entries), values)
 
         # ---- Seed data ----
+        self._batch_mode = True
         if self.donthuoc and getattr(self.donthuoc, "chidinh_list", None):
             for chi in self.donthuoc.chidinh_list:
                 add_row({
@@ -409,6 +415,13 @@ class PrescriptionTable:
                 add_row(row)
         else:
             add_row()
+        self._batch_mode = False
+
+        refresh_grid()
+        canvas.update_idletasks()
+        canvas.configure(scrollregion=canvas.bbox("all"))
+        if self.entries:
+            self.frame.after(50, lambda: self.entries[0]["entries"][0].focus_set())
 
         self._add_row_at_index = add_row_at_index
 

@@ -1,11 +1,12 @@
 import os
+import sys
+from pathlib import Path
 import ttkbootstrap as tb
 from tkinter import font as tkfont, messagebox
 from ctypes import windll
 from medicine import show_thuoc_window
 from ui.record.screen import show_ho_so_window
 import traceback
-import sys
 
 def show_primary_window(root, container):
     """Render the home screen."""
@@ -46,7 +47,11 @@ def main():
     root.state("zoomed")
 
     # --- Load custom TTF font ---
-    font_path = os.path.abspath("./Quicksand-Regular.ttf")
+    if getattr(sys, "frozen", False):
+        app_dir = Path(sys.executable).parent
+    else:
+        app_dir = Path(__file__).resolve().parent
+    font_path = str(app_dir / "Quicksand-Regular.ttf")
     if os.name == "nt":  # Windows only
         windll.gdi32.AddFontResourceW(font_path)
 
