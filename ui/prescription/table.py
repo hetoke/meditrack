@@ -93,7 +93,7 @@ class TableRowFactory:
 
         entry_days = tk.Entry(
             self.parent_frame,
-            width=3,
+            width=4,
             font=self.bold_font,
             justify="center",
             relief="solid",
@@ -315,7 +315,7 @@ class PrescriptionTable:
                 row["btn_del"].grid(row=i, column=base)
                 row["btn_insert_above"].grid(row=i, column=base + 1)
                 row["btn_insert_below"].grid(row=i, column=base + 2)
-                row["entry_days"].grid(row=i, column=base + 3, padx=(2, 0))
+                row["entry_days"].grid(row=i, column=base + 3, sticky="nsew", padx=(2, 0))
 
         def update_row_days(row_obj):
             entry = row_obj["entry_days"]
@@ -348,6 +348,16 @@ class PrescriptionTable:
             except (ValueError, TypeError):
                 row_obj["days"] = 1
 
+        def fill_all_days(source_row):
+            read_row_days(source_row)
+            value = source_row["days"]
+            for row in self.entries:
+                row["days"] = value
+                entry = row["entry_days"]
+                entry.delete(0, "end")
+                entry.insert(0, str(value))
+            self._mark_dirty()
+
         def normalize_numeric_entry(entry):
             value = entry.get().strip()
             formatted = format_dose_value(value)
@@ -371,6 +381,12 @@ class PrescriptionTable:
                 "<FocusOut>",
                 lambda _event, ro=row_obj: (read_row_days(ro), self._mark_dirty()),
             )
+            def on_space(event):
+                if event.keysym == "space":
+                    fill_all_days(row_obj)
+                    return "break"
+
+            row_obj["entry_days"].bind("<Key>", on_space)
 
             # Setup entry events
             for c, entry in enumerate(row_obj["entries"]):
