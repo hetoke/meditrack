@@ -1,23 +1,20 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Union
 
 import ttkbootstrap as tb
 
 from ui.prescription.screen import show_ho_so_detail_window
 
 
-def format_last_modified(dt: Optional[datetime | date]) -> str:
+def format_last_modified(dt: Union[datetime, date, None]) -> str:
     if not dt:
         return "Chưa cập nhật"
-
     if isinstance(dt, datetime):
         return f"Cập nhật: {dt.strftime('%d/%m/%Y %H:%M')}"
-
     if isinstance(dt, date):
         return f"Cập nhật: {dt.strftime('%d/%m/%Y')}"
-
     return "Chưa cập nhật"
 
 

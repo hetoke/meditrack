@@ -69,7 +69,7 @@ def seed_data(session, medicines):
             DiaChi="Stress Address",
             DienThoai=f"09{random.randint(10000000,99999999)}",
             TienCan="",
-            NgayMoHoSo=date.today()
+            NgayMoHoSo=date.today(),
         )
         session.add(hoso)
         session.flush()  # get HoSoID

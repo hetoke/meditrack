@@ -159,7 +159,17 @@ def render_record_list(
         left = tb.Frame(row)
         left.pack(side="left", fill="x", expand=True)
 
-        tb.Label(left, text=f"{name} - {year}", font=("Quicksand", 12)).pack(anchor="w")
+        name_row = tb.Frame(left)
+        name_row.pack(fill="x")
+
+        tb.Label(name_row, text=f"{name} - {year}", font=("Quicksand", 12)).pack(side="left")
+
+        tb.Label(
+            name_row,
+            text=format_last_modified(last_modified),
+            font=("Quicksand", 9),
+            foreground="#6c757d",
+        ).pack(side="right", padx=(8, 0))
 
         btn_frame = tb.Frame(row, width=300, height=28)
         btn_frame.pack(side="right")
@@ -197,16 +207,6 @@ def render_record_list(
                 search_query,
             ),
         ).pack(side="left", padx=2)
-
-        right = tb.Frame(row)
-        right.pack(side="right", padx=10)
-
-        tb.Label(
-            right,
-            text=format_last_modified(last_modified),
-            font=("Quicksand", 10),
-            foreground="#6c757d",
-        ).pack(anchor="e")
 
         click_handler = lambda e, r=record: open_detail(
             e, root, container, r, show_ho_so_window, show_primary_window

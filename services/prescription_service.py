@@ -127,11 +127,7 @@ def save_prescription(
     try:
         if donthuoc_obj is None:
             donthuoc_obj = DonThuoc(HoSoID=hoso_id)
-
         donthuoc_obj.NgayLap = datetime.now()
-        hoso_obj = session.get(HoSo, hoso_id)
-        if hoso_obj:
-            hoso_obj.NgayMoHoSo = donthuoc_obj.NgayLap
         donthuoc_obj.MoTa = chandoan_text
 
         donthuoc_obj = session.merge(donthuoc_obj)

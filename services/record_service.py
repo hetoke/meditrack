@@ -86,6 +86,7 @@ def create_record(
     tiencan: str,
 ) -> None:
     session = get_session()
+    now = datetime.now()
     hoso = HoSo(
         Ten=name,
         GivenName=name.strip().split()[-1].lower(),
@@ -93,7 +94,7 @@ def create_record(
         DiaChi=address,
         DienThoai=phone,
         TienCan=tiencan,
-        NgayMoHoSo=datetime.now(),
+        NgayMoHoSo=now,
     )
     session.add(hoso)
     session.commit()

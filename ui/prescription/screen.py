@@ -90,7 +90,7 @@ def show_ho_so_detail_window(
 ) -> None:
     container = clear_parents(container, stop_at=root, levels=2)
 
-    hoso_id, name, year, address, phone, tiencan, _ = record
+    hoso_id, name, year, address, phone, tiencan, created_at = record
 
     sidebar = tb.Frame(container, padding=20)
     sidebar.pack(side="left", fill="y")
@@ -144,8 +144,11 @@ def show_ho_so_detail_window(
     next_btn = tb.Button(nav_row, text="Sau")
     next_btn.pack(side="left", expand=True, fill="x", padx=(2, 0))
 
-    date_label = tb.Label(sidebar_nav, text="")
+    date_label = tb.Label(sidebar_nav, text="", justify="left", anchor="w", font=("Quicksand", 11))
     date_label.pack(fill="x", pady=2)
+
+    if created_at:
+        date_label.config(text=f"Ngày lập: {format_ngaylap(created_at)}")
 
     _total_after_id: dict[str, Optional[str]] = {"id": None}
 
@@ -181,11 +184,6 @@ def show_ho_so_detail_window(
 
         current_index["value"] = index
         nav_label.config(text=f"Đơn {index + 1}/{len(prescriptions)}")
-
-        if table.donthuoc and table.donthuoc.NgayLap:
-            date_label.config(text=f"Ngày lập đơn thuốc: {format_ngaylap(table.donthuoc.NgayLap)}")
-        else:
-            date_label.config(text="")
 
         update_sidebar_total(table)
 
@@ -260,7 +258,7 @@ def show_ho_so_detail_window(
             return
 
         if don_obj and don_obj.NgayLap:
-            date_label.config(text=f"Ngày lập đơn thuốc: {format_ngaylap(don_obj.NgayLap)}")
+            date_label.config(text=f"Ngày lập: {format_ngaylap(don_obj.NgayLap)}")
 
         update_sidebar_total(table)
         messagebox.showinfo("Thông báo", "Đã lưu đơn thuốc thành công!")

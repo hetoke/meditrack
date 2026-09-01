@@ -24,7 +24,7 @@ Move Tiền căn box into the sidebar [resolved]
 Updating pagination to record list [resolved]
 	- 15 items per page, show name, year and last modified timestamp, fallback at record creation date
 Sorting latest record at the top of the list [resolved]
-Make prescription table fit horizontally by default [resolved by decrease column size] 
+Make prescription table fit horizontally by default [resolved by decrease column size]
 Allow swapping prescription rows up or down option [resolved]
 Allow Enter key to go the next box in prescription table (double Enter on medicine name field) [resolved]
 Check dirty exit on only current prescription [resolved]
@@ -60,3 +60,14 @@ lower the size of number cell in prescription (contain at most 2 decimal places)
 flag button for no money calculation on specified row
 medicine name and doses as bold text
 border line in prescription table as black
+
+1.39
+entry_days for multiple days prescription
+2 timestamps, created and last modified
+
+1.40
+Trước Sau button on detail view shown as timestamp in the UI
+No. / total on prescription count should have input method
+Tiền căn in detail view can be modified
+Rollback to the 1 timestamp
+Warning after save, "old changes will lost and new changes will become the newest prescription"

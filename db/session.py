@@ -19,19 +19,13 @@ TEST = sqlite_url("clinic_stress.db")
 PROD = sqlite_url("clinic_prod.db")
 
 # SQLite engine (change the connection string if needed)
-engine = create_engine(DEV, echo=False)
+engine = create_engine(PROD if getattr(sys, "frozen", False) else DEV, echo=False)
 
 from db.models import Base
 Base.metadata.create_all(engine)
 
-from sqlalchemy import text
-with engine.begin() as conn:
-    columns = {row[1] for row in conn.execute(text("PRAGMA table_info(chidinh)"))}
-    if "SoNgay" not in columns:
-        conn.execute(text("ALTER TABLE chidinh ADD COLUMN SoNgay INTEGER NOT NULL DEFAULT 1"))
-        if "KhongTinhTien" in columns:
-            conn.execute(text("UPDATE chidinh SET SoNgay = 0 WHERE KhongTinhTien = 1"))
-            conn.execute(text("ALTER TABLE chidinh DROP COLUMN KhongTinhTien"))
+from migrations import run_all
+run_all(engine)
 
 # Session factory
 SessionLocal = sessionmaker(bind=engine)
