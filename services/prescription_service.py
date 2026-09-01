@@ -125,10 +125,15 @@ def save_prescription(
 ) -> tuple[DonThuoc, float]:
     session = get_session()
     try:
+        now = datetime.now()
         if donthuoc_obj is None:
             donthuoc_obj = DonThuoc(HoSoID=hoso_id)
-        donthuoc_obj.NgayLap = datetime.now()
+        donthuoc_obj.NgayLap = now
         donthuoc_obj.MoTa = chandoan_text
+
+        hoso_obj = session.get(HoSo, hoso_id)
+        if hoso_obj:
+            hoso_obj.NgayMoHoSo = now
 
         donthuoc_obj = session.merge(donthuoc_obj)
         session.flush()
