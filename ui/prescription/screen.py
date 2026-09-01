@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+from tkinter import TclError, messagebox
 from typing import Any, Callable, Optional
 
 import ttkbootstrap as tb
 import tkinter as tk
-from tkinter import messagebox
 
 from services.prescription_service import (
     delete_prescription_by_id,
@@ -14,7 +14,8 @@ from services.prescription_service import (
     save_prescription,
 )
 from ui.prescription.table import PrescriptionTable
-from utils.formatter import format_currency, format_ngaylap
+from services.record_service import update_record
+from utils.formatter import format_currency, format_ngaylap, format_ngaylap_short
 from utils.tk_helpers import clear_parents
 
 
@@ -118,11 +119,16 @@ def show_ho_so_detail_window(
     tiencan_box = tb.Labelframe(sidebar, text="Tiền căn", padding=10)
     tiencan_box.pack(fill="x", pady=(2, 4), expand=False)
 
-    tiencan_text = tk.Text(tiencan_box, height=3, width=28, wrap="word", bg="white", fg="black")
+    tiencan_text = tk.Text(tiencan_box, height=6, width=28, wrap="word", bg="white", fg="black")
     tiencan_text.pack(fill="x")
     if tiencan:
         tiencan_text.insert("1.0", tiencan)
-    tiencan_text.config(state="disabled")
+
+    def save_tiencan(_event: Any = None) -> None:
+        new_val = tiencan_text.get("1.0", "end").strip()
+        update_record(hoso_id, name, str(year) if year else "", address or "", phone or "", new_val)
+
+    tiencan_text.bind("<FocusOut>", save_tiencan)
 
     current_index: dict[str, int] = {"value": 0}
     summary_rows = fetch_prescription_summaries_by_hoso(hoso_id)
@@ -135,14 +141,29 @@ def show_ho_so_detail_window(
     nav_row = tb.Frame(sidebar_nav)
     nav_row.pack(fill="x", pady=2)
 
-    prev_btn = tb.Button(nav_row, text="Trước")
-    prev_btn.pack(side="left", expand=True, fill="x", padx=(0, 2))
+    prev_btn = tb.Button(nav_row, text="")
+    prev_btn.pack(side="left", fill="x", padx=(0, 2))
 
-    nav_label = tb.Label(nav_row, text="")
-    nav_label.pack(side="left", expand=True, fill="x")
+    nav_entry_var = tk.StringVar(value="1")
+    nav_entry = tk.Entry(nav_row, textvariable=nav_entry_var, width=4, justify="center", font=("Quicksand", 11))
+    nav_entry.pack(side="left")
+    nav_total_label = tb.Label(nav_row, text="/ 1")
+    nav_total_label.pack(side="left", padx=(2, 0))
 
-    next_btn = tb.Button(nav_row, text="Sau")
-    next_btn.pack(side="left", expand=True, fill="x", padx=(2, 0))
+    next_btn = tb.Button(nav_row, text="")
+    next_btn.pack(side="left", fill="x", padx=(2, 0))
+
+    def jump_to_prescription(_event: Any = None) -> None:
+        try:
+            val = int(nav_entry_var.get())
+        except (ValueError, TclError):
+            return
+        if 1 <= val <= len(prescriptions):
+            show_prescription(val - 1)
+        nav_entry.selection_clear()
+
+    nav_entry.bind("<Return>", jump_to_prescription)
+    nav_entry.bind("<FocusOut>", jump_to_prescription)
 
     date_label = tb.Label(sidebar_nav, text="", justify="left", anchor="w", font=("Quicksand", 11))
     date_label.pack(fill="x", pady=2)
@@ -183,7 +204,29 @@ def show_ho_so_detail_window(
         table.pack(fill="both", expand=True)
 
         current_index["value"] = index
-        nav_label.config(text=f"Đơn {index + 1}/{len(prescriptions)}")
+        nav_entry_var.set(str(index + 1))
+        nav_total_label.config(text=f"/ {len(prescriptions)}")
+
+        if table.donthuoc and table.donthuoc.NgayLap:
+            date_label.config(text=f"Ngày lập: {format_ngaylap(table.donthuoc.NgayLap)}")
+        else:
+            date_label.config(text="")
+
+        if index > 0 and prescription_ids[index - 1]:
+            don_prev = prescriptions[index - 1].donthuoc if prescriptions[index - 1] else None
+            if don_prev is None:
+                don_prev = fetch_prescription_detail_by_id(prescription_ids[index - 1])
+            prev_btn.config(text=format_ngaylap_short(don_prev.NgayLap) if don_prev and don_prev.NgayLap else "")
+        else:
+            prev_btn.config(text="")
+
+        if index < len(prescriptions) - 1 and prescription_ids[index + 1]:
+            don_next = prescriptions[index + 1].donthuoc if prescriptions[index + 1] else None
+            if don_next is None:
+                don_next = fetch_prescription_detail_by_id(prescription_ids[index + 1])
+            next_btn.config(text=format_ngaylap_short(don_next.NgayLap) if don_next and don_next.NgayLap else "")
+        else:
+            next_btn.config(text="")
 
         update_sidebar_total(table)
 
@@ -202,6 +245,7 @@ def show_ho_so_detail_window(
         table = PrescriptionTable(content)
         table.on_change = lambda: update_sidebar_total(table)
         prescriptions.append(table)
+        nav_total_label.config(text=f"/ {len(prescriptions)}")
         show_prescription(len(prescriptions) - 1)
 
     def duplicate_prescription() -> None:
@@ -231,8 +275,10 @@ def show_ho_so_detail_window(
         prescriptions.pop(index)
 
         if prescriptions:
+            nav_total_label.config(text=f"/ {len(prescriptions)}")
             show_prescription(min(index, len(prescriptions) - 1))
         else:
+            nav_total_label.config(text="/ 1")
             new_table = PrescriptionTable(content)
             new_table.on_change = lambda: update_sidebar_total(new_table)
             prescriptions.append(new_table)
@@ -240,6 +286,12 @@ def show_ho_so_detail_window(
 
     def save_current_prescription() -> None:
         if not prescriptions:
+            return
+
+        if not messagebox.askyesno(
+            "Xác nhận",
+            "Đơn thuốc cũ sẽ bị thay thế bởi đơn thuốc mới nhất.\nBạn có chắc chắn muốn lưu?",
+        ):
             return
 
         try:

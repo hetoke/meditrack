@@ -21,3 +21,11 @@ def format_ngaylap(value: Union[datetime, date, None]) -> str:
     if isinstance(value, date):
         return value.strftime("%d/%m/%Y 00:00:00")
     return datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+
+def format_ngaylap_short(value: Union[datetime, date, None]) -> str:
+    if isinstance(value, datetime):
+        return value.strftime("%d/%m %H:%M")
+    if isinstance(value, date):
+        return value.strftime("%d/%m")
+    return ""

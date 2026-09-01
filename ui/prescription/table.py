@@ -138,6 +138,10 @@ class TableRowFactory:
                 focus_cell_callback(row_idx, 1)
                 return "break"
 
+            # Dose column - mark dirty on enter
+            if col > 0:
+                self.on_dirty_callback()
+
             # Normal columns (not medicine)
             next_col = col + 1
             if next_col < len(self.columns):
