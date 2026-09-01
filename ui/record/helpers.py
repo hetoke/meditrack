@@ -12,9 +12,9 @@ def format_last_modified(dt: Union[datetime, date, None]) -> str:
     if not dt:
         return "Chưa cập nhật"
     if isinstance(dt, datetime):
-        return f"Cập nhật: {dt.strftime('%d/%m/%Y %H:%M')}"
+        return f"Cập nhật: {dt.strftime('%d/%m/%Y %H:%M:%S')}"
     if isinstance(dt, date):
-        return f"Cập nhật: {dt.strftime('%d/%m/%Y')}"
+        return f"Cập nhật: {dt.strftime('%d/%m/%Y 00:00:00')}"
     return "Chưa cập nhật"
 
 

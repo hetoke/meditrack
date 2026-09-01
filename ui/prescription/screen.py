@@ -119,7 +119,7 @@ def show_ho_so_detail_window(
     tiencan_box = tb.Labelframe(sidebar, text="Tiền căn", padding=10)
     tiencan_box.pack(fill="x", pady=(2, 4), expand=False)
 
-    tiencan_text = tk.Text(tiencan_box, height=6, width=28, wrap="word", bg="white", fg="black")
+    tiencan_text = tk.Text(tiencan_box, height=5, width=28, wrap="word", bg="white", fg="black")
     tiencan_text.pack(fill="x")
     if tiencan:
         tiencan_text.insert("1.0", tiencan)
@@ -312,6 +312,7 @@ def show_ho_so_detail_window(
         if don_obj and don_obj.NgayLap:
             date_label.config(text=f"Ngày lập: {format_ngaylap(don_obj.NgayLap)}")
 
+        show_prescription(current_index["value"])
         update_sidebar_total(table)
         messagebox.showinfo("Thông báo", "Đã lưu đơn thuốc thành công!")
 

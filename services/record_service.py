@@ -59,8 +59,20 @@ def fetch_records_page(
             .offset((page - 1) * page_size)
             .all()
         )
+
+        hoso_ids = [r.HoSoID for r in rows]
+        latest_rx: dict[int, Optional[datetime]] = {}
+        if hoso_ids:
+            rx_rows = (
+                session.query(DonThuoc.HoSoID, func.max(DonThuoc.NgayLap))
+                .filter(DonThuoc.HoSoID.in_(hoso_ids))
+                .group_by(DonThuoc.HoSoID)
+                .all()
+            )
+            latest_rx = {hid: dt for hid, dt in rx_rows}
+
         result: list[Record] = [
-            (r.HoSoID, r.Ten, r.NamSinh, r.DiaChi, r.DienThoai, r.TienCan, r.NgayMoHoSo)
+            (r.HoSoID, r.Ten, r.NamSinh, r.DiaChi, r.DienThoai, r.TienCan, latest_rx.get(r.HoSoID) or r.NgayMoHoSo)
             for r in rows
         ]
         return result, total
